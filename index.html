@@ -1,0 +1,1845 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OnonoFixFlow - ระบบแจ้งซ่อม</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #f8fafc; }
+        .tab-button-active { border-bottom: 4px solid #fff; color: #fff; opacity: 1; }
+        .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 9999; align-items: center; justify-content: center; color: white; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes popIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-fadeIn { animation: fadeIn 0.4s ease-out; }
+        .animate-popIn { animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        /* Liquid Glass Navigation States */
+        .glass-active {
+            background: rgba(255, 255, 255, 0.9);
+            color: #4f46e5 !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            transform: translateY(-2px);
+        }
+        .glass-nav-btn {
+            color: #475569;
+        }
+        .glass-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.4);
+            color: #334155;
+        }
+        /* Glass Sub-Navigation */
+        .glass-sub-active {
+            background: rgba(255, 255, 255, 0.8);
+            color: #4f46e5 !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            border: 1px solid rgba(255,255,255,1);
+        }
+        .glass-sub-btn {
+            color: #64748b;
+            border: 1px solid transparent;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center">
+            <i class="fas fa-spinner fa-spin fa-3x mb-3"></i>
+            <p class="text-xl">กำลังประมวลผล...</p>
+        </div>
+    </div>
+
+<!-- Modal Login & Register -->
+<div id="authScreen" class="fixed inset-0 bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 z-[300] flex items-center justify-center p-4">
+  <div class="bg-white/70 backdrop-blur-2xl border border-white/80 max-w-md w-full rounded-[32px] p-8 shadow-2xl animate-popIn">
+      
+      <!-- Header -->
+      <div class="text-center mb-6">
+          <div class="w-16 h-16 bg-indigo-100/80 text-indigo-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3 shadow-inner border border-white">
+              <i class="fas fa-tools"></i>
+          </div>
+          <h2 id="authTitle" class="text-2xl font-black text-slate-800">OnonoFixFlow</h2>
+          <p id="authSubtitle" class="text-sm text-slate-500">ระบบบริหารงานซ่อมจักรและอะไหล่</p>
+      </div>
+
+      <!-- แท็บสลับ เข้าสู่ระบบ / ลงทะเบียน -->
+      <div class="flex bg-slate-200/50 p-1 rounded-2xl mb-6 border border-white/50">
+          <button type="button" id="tabLoginBtn" onclick="switchAuthMode('login')" class="flex-1 py-2 text-sm font-bold rounded-xl bg-white shadow-sm text-indigo-600 transition">
+              เข้าสู่ระบบ
+          </button>
+          <button type="button" id="tabRegisterBtn" onclick="switchAuthMode('register')" class="flex-1 py-2 text-sm font-bold rounded-xl text-slate-500 hover:text-indigo-600 transition">
+              สมัครใช้งานใหม่
+          </button>
+      </div>
+
+      <!-- ฟอร์มเข้าสู่ระบบ (Login) -->
+      <form id="loginForm" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+          <div>
+              <label class="text-xs font-bold text-slate-400 uppercase">Username</label>
+              <input type="text" id="loginUsername" required placeholder="ชื่อผู้ใช้งาน" class="w-full mt-1 p-3.5 bg-white/60 border border-slate-200/80 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+          <div>
+              <label class="text-xs font-bold text-slate-400 uppercase">Password</label>
+              <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full mt-1 p-3.5 bg-white/60 border border-slate-200/80 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+          <div id="loginErrorMessage" class="text-red-500 text-sm hidden"></div>
+          <button type="submit" class="w-full py-4 bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 text-white rounded-2xl font-bold text-lg shadow-lg hover:opacity-90 transition">
+              เข้าสู่ระบบ
+          </button>
+      </form>
+
+      <!-- ฟอร์มลงทะเบียน (Register) -->
+      <form id="registerForm" onsubmit="handleRegisterSubmit(event)" class="space-y-3 hidden">
+          <div>
+              <label class="text-xs font-bold text-slate-400 uppercase">ชื่อผู้ใช้ (Username)</label>
+              <input type="text" id="regUsername" required placeholder="สำหรับใช้เข้าสู่ระบบ" class="w-full mt-1 p-3 bg-white/60 border border-slate-200/80 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+          <div>
+              <label class="text-xs font-bold text-slate-400 uppercase">รหัสผ่าน</label>
+              <input type="password" id="regPassword" required placeholder="กำหนดรหัสผ่าน 8 หลัก" class="w-full mt-1 p-3 bg-white/60 border border-slate-200/80 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+          <div>
+              <label class="text-xs font-bold text-slate-400 uppercase">ชื่อ - นามสกุลจริง</label>
+              <input type="text" id="regFullName" required placeholder="เช่น สมชาย ใจดี" class="w-full mt-1 p-3 bg-white/60 border border-slate-200/80 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+              <div>
+                  <label class="text-xs font-bold text-slate-400 uppercase">แผนก / ไลน์ผลิต</label>
+                  <input type="text" id="regDepartment" required placeholder="เช่น ไลน์ 1" class="w-full mt-1 p-3 bg-white/60 border border-slate-200/80 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400">
+              </div>
+              <div>
+                  <label class="text-xs font-bold text-slate-400 uppercase">บทบาท (Role)</label>
+                  <select id="regRole" class="w-full mt-1 p-3 bg-white/60 border border-slate-200/80 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400">
+                      <option value="User">ผู้แจ้งซ่อม</option>
+                      <option value="Maintenance">ช่างซ่อมจักร</option>
+                  </select>
+              </div>
+          </div>
+          <div id="registerErrorMessage" class="text-red-500 text-sm hidden"></div>
+          <button type="submit" class="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold text-lg shadow-lg hover:bg-emerald-700 transition mt-2">
+              ยืนยันการลงทะเบียน
+          </button>
+      </form>
+  </div>
+</div>
+
+<!-- Top Header -->
+<header class="bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-600 text-white shadow-xl sticky top-0 z-40 w-full">
+  <div class="w-full px-6 py-4 flex justify-between items-center">
+      <h1 class="text-xl md:text-2xl font-bold flex items-center gap-3">
+          <i class="fas fa-tools text-yellow-300"></i> Onono FixFlow
+      </h1>
+      <div class="flex items-center gap-3">
+          <span id="userBadge" class="text-xs md:text-sm bg-white/20 px-4 py-1.5 rounded-full font-bold shadow-inner"></span>
+          <button onclick="logout()" class="text-xs md:text-sm bg-red-500 hover:bg-red-600 px-4 py-1.5 rounded-full shadow-lg transition-all active:scale-95">
+              <i class="fas fa-sign-out-alt"></i>
+          </button>
+      </div>
+  </div>
+</header>
+
+    <!-- Liquid Glass Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 w-full z-50 flex items-center justify-around p-3 bg-white/70 backdrop-blur-xl border-t border-white/50 shadow-[0_-8px_30px_rgba(0,0,0,0.08)] rounded-t-3xl">
+      <button onclick="showTab('dashboardContent')" id="dashboardTab" class="glass-nav-btn flex-1 flex flex-col items-center py-2.5 px-2 rounded-full transition-all duration-300 font-medium glass-active">
+          <i class="fas fa-home text-xl mb-1"></i>
+          <span class="text-[12px] uppercase tracking-wide font-bold">แดชบอร์ด</span>
+      </button>
+      <button onclick="showTab('repairContent')" id="repairTab" class="glass-nav-btn flex-1 flex flex-col items-center py-2.5 px-2 rounded-full transition-all duration-300 font-medium">
+          <i class="fas fa-wrench text-xl mb-1"></i>
+          <span class="text-[12px] uppercase tracking-wide font-bold">แจ้งซ่อม</span>
+      </button>
+      <button onclick="showTab('inventoryContent')" id="inventoryTab" class="glass-nav-btn flex-1 flex flex-col items-center py-2.5 px-2 rounded-full transition-all duration-300 font-medium">
+          <i class="fas fa-boxes text-xl mb-1"></i>
+          <span class="text-[12px] uppercase tracking-wide font-bold">คลังอะไหล่</span>
+      </button>
+      <button onclick="showTab('reportsContent')" id="reportsTab" class="glass-nav-btn flex-1 flex flex-col items-center py-2.5 px-2 rounded-full transition-all duration-300 font-medium">
+          <i class="fas fa-chart-pie text-xl mb-1"></i>
+          <span class="text-[12px] uppercase tracking-wide font-bold">รายงาน</span>
+      </button>
+    </nav>
+
+    <main class="w-full px-6 pt-8 pb-32">
+        <!-- 1. Dashboard -->
+        <div id="dashboardContent" class="tab-content animate-fadeIn">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+                <div onclick="showStatDetail('All')" class="bg-white p-6 rounded-[30px] shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition-all active:scale-95">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center text-xl">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-large">แจ้งซ่อมทั้งหมดวันนี้</p>
+                            <h3 id="statTotal" class="text-4xl font-bold mt-2">0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div onclick="showStatDetail('Pending')" class="bg-white p-6 rounded-[30px] shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition-all active:scale-95">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-orange-50 text-orange-500 rounded-2xl flex items-center justify-center text-xl">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-large">รอดำเนินการ</p>
+                            <h3 id="statPending" class="text-4xl font-bold mt-2 text-red-600">0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div onclick="showStatDetail('In Progress')" class="bg-white p-6 rounded-[30px] shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition-all active:scale-95">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center text-xl">
+                            <i class="fas fa-tools"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-large">กำลังดำเนินการ</p>
+                            <h3 id="statProgress" class="text-4xl font-bold mt-2 text-yellow-600">0</h3>
+                        </div>
+                    </div>
+                </div>
+                <div onclick="showStatDetail('Completed')" class="bg-white p-6 rounded-[30px] shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition-all active:scale-95">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center text-xl">
+                            <i class="fas fa-check-double"></i>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-large">เสร็จสิ้น</p>
+                            <h3 id="statDone" class="text-4xl font-bold mt-2 text-green-600">0</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-8 bg-white p-6 rounded-[30px] shadow-sm border border-slate-50">
+                <div class="flex items-center gap-2 mb-4">
+                    <div class="w-2 h-6 bg-indigo-500 rounded-full"></div>
+                    <h3 class="text-lg font-bold text-slate-800">สถานะทีมช่าง (กำลังดำเนินการ)</h3>
+                </div>
+                <div id="techStatusContainer" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    <p class="text-slate-400 text-large italic">ไม่มีช่างที่กำลังปฏิบัติงาน</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white p-8 rounded-[35px] shadow-sm border border-slate-50 flex flex-col h-[450px]">
+                    <h3 class="text-xl font-black text-slate-800 mb-6">สรุปรายวัน</h3>
+                    <div class="flex-1 relative">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-white p-8 rounded-[35px] shadow-sm border border-slate-50 flex flex-col h-[450px]">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-xl font-black text-slate-800">รายการล่าสุด</h3>
+                        <a href="javascript:void(0)" onclick="showTab('repairContent')" class="text-indigo-600 text-sm font-bold hover:underline">
+                            ดูทั้งหมด
+                        </a>
+                    </div>
+                    <div id="recentList" class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. Repair Section -->
+        <div id="repairContent" class="tab-content hidden animate-fadeIn">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                <div>
+                    <h3 class="text-3xl font-bold text-slate-800 tracking-tight">
+                        <i class="fas fa-clipboard-list mr-2 text-purple-600"></i> รายการแจ้งซ่อม
+                    </h3>
+                    <p class="text-slate-500 mt-1">จัดการและติดตามสถานะงานซ่อมบำรุงทั้งหมด</p>
+                </div>
+                <button id="btnOpenRepairModal" onclick="toggleRepairModal(true)" class="w-full md:w-auto px-8 py-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-2xl font-bold shadow-xl shadow-purple-200 hover:scale-[1.03] active:scale-95 transition-all flex items-center justify-center gap-2">
+                    <i class="fas fa-plus-circle text-lg"></i>
+                    <span>สร้างใบแจ้งซ่อมใหม่</span>
+                </button>
+            </div>
+            <div class="bg-white p-6 md:p-10 rounded-[40px] shadow-sm border border-slate-100 min-h-[600px]">
+                <div class="flex items-center gap-3 mb-8 pb-4 border-b border-slate-50">
+                    <div class="w-2 h-6 bg-purple-500 rounded-full"></div>
+                    <h4 class="font-bold text-slate-700 uppercase tracking-wider text-large">งานที่บันทึกในระบบ</h4>
+                </div>
+                <div id="requestDisplayList" class="grid grid-cols-1 lg:grid-cols-1 gap-6"></div>
+            </div>
+        </div>
+
+        <!-- 3. Inventory Section -->
+        <div id="inventoryContent" class="tab-content hidden animate-fadeIn">
+          <div class="flex w-full gap-1.5 mb-8 bg-slate-200/40 backdrop-blur-md p-1.5 rounded-2xl shadow-inner">
+            <button onclick="showInventorySubTab('stock')" id="subTabStock" class="glass-sub-active flex-1 flex flex-col items-center py-2 px-1 rounded-xl transition-all duration-300">
+                <i class="fas fa-boxes text-lg mb-1"></i>
+                <span class="text-[10px] md:text-xs font-bold uppercase tracking-wider">คงเหลือ</span>
+            </button>
+            <button onclick="showInventorySubTab('withdraw')" id="subTabWithdraw" class="glass-sub-btn flex-1 flex flex-col items-center py-2 px-1 rounded-xl transition-all duration-300 hover:bg-white/40">
+                <i class="fas fa-minus-circle text-lg mb-1"></i>
+                <span class="text-[10px] md:text-xs font-bold uppercase tracking-wider">เบิกอะไหล่</span>
+            </button>
+            <button onclick="showInventorySubTab('addStock')" id="subTabAddStock" class="glass-sub-btn flex-1 flex flex-col items-center py-2 px-1 rounded-xl transition-all duration-300 hover:bg-white/40">
+                <i class="fas fa-plus-circle text-lg mb-1"></i>
+                <span class="text-[10px] md:text-xs font-bold uppercase tracking-wider">รับเข้า</span>
+            </button>
+            <button onclick="showInventorySubTab('history')" id="subTabHistory" class="glass-sub-btn flex-1 flex flex-col items-center py-2 px-1 rounded-xl transition-all duration-300 hover:bg-white/40">
+                <i class="fas fa-history text-lg mb-1"></i>
+                <span class="text-[10px] md:text-xs font-bold uppercase tracking-wider">ประวัติ</span>
+            </button>
+        </div>
+
+            <!-- Stock List -->
+            <div id="subContentStock" class="inventory-sub-content animate-fadeIn">
+                <div class="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-gray-100">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 md:mb-8 gap-4">
+                        <div>
+                            <h3 class="text-lg md:text-2xl font-bold italic text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">
+                                <i class="fas fa-boxes mr-2"></i> คลังอะไหล่สำรอง
+                            </h3>
+                            <p class="text-[11px] md:text-sm text-gray-400">จัดการข้อมูลและตรวจสอบจำนวนอะไหล่คงเหลือ</p>
+                        </div>
+                        <div class="relative w-full md:w-72">
+                            <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm"></i>
+                            <input type="text" id="spareSearch" onkeyup="filterSpares()" placeholder="ค้นหาชื่อหรือรหัส..." 
+                                class="w-full pl-10 pr-4 py-2.5 md:py-3 text-sm md:text-base bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-400 outline-none transition">
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto rounded-2xl border border-gray-100 custom-scrollbar">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-600 uppercase text-[10px] md:text-sm font-bold whitespace-nowrap">
+                                    <th class="px-3 py-3 md:px-6 md:py-4">รหัสอะไหล่</th>
+                                    <th class="px-3 py-3 md:px-6 md:py-4">รายการ</th>
+                                    <th class="px-3 py-3 md:px-6 md:py-4 text-center">คงเหลือ</th>
+                                    <th class="px-3 py-3 md:px-6 md:py-4">หน่วย</th>
+                                    <th class="px-3 py-3 md:px-6 md:py-4">สถานะ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="spareTableBody" class="divide-y divide-gray-50 text-xs md:text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Withdraw Form -->
+            <div id="subContentWithdraw" class="inventory-sub-content hidden animate-fadeIn">
+                <div class="max-w-4xl mx-auto">
+                    <form onsubmit="handleWithdrawSubmit(event)" class="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+                        <h3 class="text-2xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">
+                            <i class="fas fa-minus-circle mr-2"></i> บันทึกการเบิกอะไหล่
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                            <div>
+                                <label class="text-medium font-bold text-gray-400 uppercase">อ้างอิงใบแจ้งซ่อม</label>
+                                <select id="withdrawRequestID" required class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-400">
+                                    <option value="">-- เลือกรายการแจ้งซ่อม --</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-medium font-bold text-gray-400 uppercase">ชื่อผู้เบิก</label>
+                                <input type="text" id="withdrawUser" required class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-400">
+                            </div>
+                        </div>
+                        <div class="mb-6">
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="text-medium font-bold text-gray-400 uppercase">รายการอะไหล่ที่เบิก</label>
+                                <button type="button" onclick="addSpareRow()" class="text-medium text-blue-600 font-bold">
+                                    <i class="fas fa-plus-circle"></i> เพิ่มรายการ
+                                </button>
+                            </div>
+                            <div id="spareItemsContainer" class="space-y-3"></div>
+                        </div>
+                        <div class="mb-8">
+                            <label class="text-medium font-bold text-gray-400 uppercase">หมายเหตุเพิ่มเติม</label>
+                            <textarea id="withdrawRemark" rows="3" placeholder="ระบุรายละเอียดเพิ่มเติม (ถ้ามี)..." 
+                                class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-400 resize-none"></textarea>
+                        </div>
+                        <button type="submit" class="w-full py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white text-xl rounded-2xl font-bold shadow-lg hover:scale-[1.01] transition-transform">
+                            ยืนยันการเบิกและตัดสต็อก
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Add Stock Form -->
+            <div id="subContentAddStock" class="inventory-sub-content hidden animate-fadeIn">
+                <div class="max-w-4xl mx-auto">
+                    <form onsubmit="handleAddStockSubmit(event)" class="bg-white p-8 rounded-3xl shadow-xl border-l-8 border-green-500">
+                        <h3 class="text-2xl font-bold mb-8 text-green-700">
+                            <i class="fas fa-plus-circle mr-2"></i> รับอะไหล่เข้าคลัง (Add Stock)
+                        </h3>
+                        <div class="mb-6">
+                            <label class="text-medium font-bold text-gray-400 uppercase">ชื่อผู้นำเข้า/เลขที่ใบสั่งซื้อ</label>
+                            <input type="text" id="addStockRef" required placeholder="เช่น PO-67001 หรือ ชื่อเจ้าหน้าที่" class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none">
+                        </div>
+                        <div class="space-y-4">
+                            <div id="addStockContainer" class="space-y-3"></div>
+                            <button type="button" onclick="addStockRow()" class="text-green-600 font-bold text-medium">+ เพิ่มรายการอะไหล่</button>
+                        </div>
+                        <div class="mt-4">
+                            <label class="text-sm font-bold text-slate-400 uppercase">หมายเหตุการรับเข้า</label>
+                            <input type="text" id="addStockRemark" placeholder="ระบุเหตุผลการรับเข้า เช่น เคลมสินค้า, ซื้อด่วน..." class="w-full mt-1 p-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none">
+                        </div>
+                        <button type="submit" class="w-full mt-10 py-4 bg-green-600 text-white text-xl rounded-2xl font-bold shadow-lg hover:bg-green-700 transition">ยืนยันการนำเข้าสต็อก</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- History Table -->
+            <div id="subContentHistory" class="inventory-sub-content hidden animate-fadeIn">
+                <div class="bg-white p-4 md:p-8 rounded-3xl shadow-xl border border-gray-100">
+                    <h3 class="text-lg md:text-2xl font-bold mb-4 md:mb-6 text-slate-800">
+                        <i class="fas fa-history mr-2 text-indigo-500"></i> ประวัติการทำรายการ
+                    </h3>
+                    <div class="overflow-x-auto custom-scrollbar">
+                      <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 text-slate-500 text-[10px] md:text-sm uppercase font-bold whitespace-nowrap">
+                                <th class="px-3 py-3 md:px-6 md:py-4">วัน-เวลา</th>
+                                <th class="px-3 py-3 md:px-6 md:py-4">ประเภท</th>
+                                <th class="px-3 py-3 md:px-6 md:py-4">อ้างอิง/ผู้ทำรายการ</th>
+                                <th class="px-3 py-3 md:px-6 md:py-4">รหัสอะไหล่</th>
+                                <th class="px-3 py-3 md:px-6 md:py-4">รายการอะไหล่</th> 
+                                <th class="px-3 py-3 md:px-6 md:py-4 text-center">จำนวน</th> 
+                                <th class="px-3 py-3 md:px-6 md:py-4">หน่วย</th>
+                                <th class="px-3 py-3 md:px-6 md:py-4 text-center">จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyTableBody" class="divide-y divide-gray-50 text-xs md:text-sm"></tbody>
+                    </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. Reports Section -->
+        <div id="reportsContent" class="tab-content hidden animate-fadeIn">
+          <div class="bg-white p-6 rounded-2xl shadow-sm mb-6 border border-slate-100">
+              <h2 class="text-xl font-bold mb-4 text-slate-800">ออกรายงานสรุป</h2>
+              <!-- ปรับ Grid เป็น 3 คอลัมน์ และเปลี่ยน Input เป็นเดือน -->
+              <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div>
+                      <label class="block text-sm font-medium text-slate-700 mb-2">ประเภทรายงาน</label>
+                      <select id="reportType" class="w-full border-slate-200 rounded-xl p-2.5 outline-none border">
+                          <option value="maintenance">รายงานประวัติการซ่อมและสาเหตุเสีย</option>
+                          <option value="inventory">รายงานสรุปยอดสต็อกคงเหลือ</option>
+                          <option value="withdraw">รายงานสรุปการเบิกใช้อะไหล่</option>
+                          <option value="receiving">รายงานสรุปการรับเข้าอะไหล่</option>
+                      </select>
+                  </div>
+                  <div>
+                      <label class="block text-sm font-medium text-slate-700 mb-2">ประจำเดือน</label>
+                      <input type="month" id="reportMonth" class="w-full border-slate-200 rounded-xl p-2.5 border focus:ring-2 focus:ring-indigo-400 outline-none">
+                  </div>
+                  <div class="flex gap-2">
+                      <button onclick="generateReport()" class="flex-1 bg-indigo-600 text-white py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition shadow-md">
+                          สร้างรายงาน
+                      </button>
+                      <button onclick="printSpecificReport()" class="bg-slate-800 text-white px-4 py-2.5 rounded-xl shadow-md hover:bg-slate-900 transition">
+                          <i class="fas fa-print"></i>
+                      </button>
+                  </div>
+              </div>
+          </div>
+          <div id="reportResult" class="bg-white p-8 rounded-2xl shadow-sm min-h-[400px]">
+              <div class="text-center text-slate-400 mt-10">
+                  <i class="fas fa-chart-bar text-5xl mb-3"></i>
+                  <p>กรุณาเลือกเงื่อนไขและกดปุ่มสร้างรายงาน</p>
+              </div>
+          </div>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- Repair Modal -->
+    <div id="repairModal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-md" onclick="toggleRepairModal(false)"></div>
+        <div class="relative bg-white w-full max-w-lg rounded-[35px] shadow-2xl overflow-hidden">
+            <div class="p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-slate-800">สร้างใบแจ้งซ่อมใหม่</h3>
+                    <button onclick="toggleRepairModal(false)" class="text-slate-400 hover:text-slate-600">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+                <form onsubmit="handleRequestSubmit(event)" class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-sm font-bold text-slate-400 uppercase">รหัสเครื่องจักร</label>
+                            <input list="machineOptions" id="formMachineCode" onchange="autoFillMachine()" required class="w-full mt-1 p-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none">
+                        </div>
+                        <div>
+                            <label class="text-sm font-bold text-slate-400 uppercase">ประเภท</label>
+                            <input type="text" id="formMachineType" readonly class="w-full mt-1 p-3 bg-slate-100 border-none rounded-2xl text-slate-500 outline-none">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-sm font-bold text-slate-400 uppercase">แผนก/ไลน์</label>
+                        <input list="departmentOptions" id="formDepartment" required class="w-full mt-1 p-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none">
+                    </div>
+                    <div>
+                        <label class="text-sm font-bold text-slate-400 uppercase">ระดับความเร่งด่วน</label>
+                        <select id="formUrgency" class="w-full mt-1 p-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none">
+                            <option value="Low">Low</option>
+                            <option value="High">High</option>
+                            <option value="Critical">Critical</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-sm font-bold text-slate-400 uppercase">อาการเสีย</label>
+                        <textarea id="formIssue" required class="w-full mt-1 p-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none h-24"></textarea>
+                    </div>
+                    <div>
+                        <label class="text-sm font-bold text-slate-400 uppercase">ผู้แจ้ง</label>
+                        <input type="text" id="formReporter" required class="w-full mt-1 p-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none">
+                    </div>
+                    <button type="submit" class="w-full py-4 mt-4 bg-gradient-to-r from-pink-500 to-purple-600 text-white text-xl rounded-2xl font-bold shadow-lg">
+                        ยืนยันการแจ้งซ่อม
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <datalist id="machineOptions"></datalist>
+    <datalist id="departmentOptions"></datalist>
+
+    <!-- Accept Task Modal -->
+    <div id="acceptTaskModal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="toggleAcceptModal(false)"></div>
+        <div class="relative bg-white w-full max-w-md rounded-[30px] shadow-2xl animate-popIn">
+            <div class="p-8">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-bold text-slate-800">
+                        <i class="fas fa-wrench text-indigo-500 mr-2"></i> รับดำเนินการซ่อม
+                    </h3>
+                    <button onclick="toggleAcceptModal(false)" class="text-slate-400 hover:text-slate-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="space-y-5">
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase ml-1">ชื่อช่างผู้รับผิดชอบ</label>
+                        <input type="text" id="techNameInput" placeholder="ระบุชื่อของคุณ..." class="w-full mt-1 p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-indigo-400 transition-all">
+                    </div>
+                    <input type="hidden" id="pendingAcceptId">
+                    <button onclick="confirmAcceptTask()" class="w-full py-4 bg-indigo-600 text-white text-xl rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all">
+                        ยืนยันการรับงาน
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Complete Task Modal -->
+    <div id="completeTaskModal" class="fixed inset-0 z-[110] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="toggleCompleteModal(false)"></div>
+        <div class="relative bg-white w-full max-w-md rounded-[30px] shadow-2xl overflow-hidden animate-popIn">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-slate-800">
+                        <i class="fas fa-check-circle text-emerald-500 mr-2"></i> ผู้แจ้งยืนยันปิดงานสำเร็จ
+                    </h3>
+                    <button onclick="toggleCompleteModal(false)" class="text-slate-400 hover:text-slate-600">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-xs font-bold text-slate-400 uppercase ml-1">
+                            รายละเอียดการซ่อม / บันทึกเพิ่มเติม
+                        </label>
+                        <textarea id="closeTaskNote" placeholder="ระบุสิ่งที่แก้ไข หรือสาเหตุของปัญหา..." class="w-full mt-1 p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none h-32 focus:ring-2 focus:ring-emerald-400 transition-all"></textarea>
+                    </div>
+                    <input type="hidden" id="pendingCompleteId"> 
+                    <button onclick="confirmCompleteTask()" class="w-full py-4 bg-emerald-600 text-white text-xl rounded-2xl font-bold shadow-lg shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all">
+                        ยืนยันการปิดงานซ่อม
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stat Detail Modal -->
+    <div id="statDetailModal" class="fixed inset-0 z-[150] hidden flex items-center justify-center p-2 md:p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="toggleStatModal(false)"></div>
+        <div class="relative bg-white w-full max-w-4xl rounded-[20px] md:rounded-[30px] shadow-2xl overflow-hidden animate-popIn">
+            <div class="p-4 md:p-6 border-b border-slate-100 flex justify-between items-center">
+                <h3 class="text-lg md:text-xl font-bold text-slate-800" id="statModalTitle">รายการแจ้งซ่อม</h3>
+                <button onclick="toggleStatModal(false)" class="text-slate-400 hover:text-slate-600">
+                    <i class="fas fa-times text-lg md:text-xl"></i>
+                </button>
+            </div>
+            <div class="overflow-x-auto max-h-[60vh] custom-scrollbar">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-slate-50 sticky top-0">
+                        <tr class="whitespace-nowrap">
+                            <th class="px-3 py-3 md:px-6 md:py-4 text-[10px] md:text-xs font-bold text-slate-400 uppercase">วันที่/เวลา</th>
+                            <th class="px-3 py-3 md:px-6 md:py-4 text-[10px] md:text-xs font-bold text-slate-400 uppercase">เครื่องจักร</th>
+                            <th class="px-3 py-3 md:px-6 md:py-4 text-[10px] md:text-xs font-bold text-slate-400 uppercase min-w-[120px]">อาการเสีย</th>
+                            <th class="px-3 py-3 md:px-6 md:py-4 text-[10px] md:text-xs font-bold text-slate-400 uppercase text-center">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statDetailTableBody" class="divide-y divide-slate-50"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="fixed inset-0 z-[200] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
+        <div class="relative bg-white w-full max-w-sm rounded-[30px] p-8 text-center animate-popIn">
+            <div class="w-20 h-20 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center text-3xl mx-auto mb-6">
+                <i class="fas fa-check"></i>
+            </div>
+            <h3 id="successTitle" class="text-2xl font-black text-slate-800 mb-2">สำเร็จ!</h3>
+            <p id="successMessage" class="text-slate-500 mb-8">ดำเนินการเรียบร้อยแล้ว</p>
+            <div class="flex gap-3">
+                <button id="btnPrintSlip" class="hidden flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center justify-center">
+                    <i class="fas fa-print mr-2"></i> พิมพ์ใบเบิก
+                </button>
+                <button onclick="closeSuccessModal()" class="flex-1 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-2xl font-bold shadow-lg shadow-emerald-200">
+                    ตกลง
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- iOS 18 Glassmorphism Alert Modal -->
+<div id="iosAlertModal" class="fixed inset-0 z-[400] hidden flex items-center justify-center p-4">
+  <!-- Backdrop Blur -->
+  <div class="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onclick="closeIosAlert()"></div>
+  
+  <!-- Modal Content (Glass Effect) -->
+  <div class="relative w-full max-w-[320px] bg-white/70 backdrop-blur-xl border border-white/50 rounded-[32px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] text-center overflow-hidden animate-popIn">
+      <div class="px-6 pt-8 pb-6">
+          <!-- Icon -->
+          <div id="iosAlertIcon" class="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center text-3xl shadow-sm">
+              <i class="fas fa-check"></i>
+          </div>
+          <!-- Text -->
+          <h3 id="iosAlertTitle" class="text-xl font-bold text-slate-800 mb-2 tracking-tight">Title</h3>
+          <p id="iosAlertMessage" class="text-sm text-slate-600 font-medium leading-relaxed">Message goes here</p>
+      </div>
+      
+      <!-- Button Area (iOS Style Split) -->
+      <div class="border-t border-slate-300/40 bg-white/20 hover:bg-white/40 transition-colors cursor-pointer active:bg-slate-100/50">
+          <button onclick="closeIosAlert()" class="w-full py-4 text-indigo-600 font-bold text-lg outline-none">
+              ตกลง
+          </button>
+      </div>
+  </div>
+</div>
+
+          <script>
+        // ==========================================
+        // 1. ตั้งค่าพื้นฐานและตัวแปรระบบ
+        // ==========================================
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbyU4X949TEpXa5QaNHQaEj482Lzs7EGC0qc_4KE67BqGOt3Cf_EM7uLPuXaxBCrah5_Gw/exec"; // นำ URL จาก Apps Script มาใส่ที่นี่
+        let currentUser = null;
+        let dataStore = { machines: [], department: [], spares: [], requests: [], transactions: [] };
+
+        // ==========================================
+        // 2. ระบบ Authentication & Session (Login / Register)
+        // ==========================================
+        function switchAuthMode(mode) {
+            const isLogin = mode === 'login';
+            document.getElementById('loginForm').classList.toggle('hidden', !isLogin);
+            document.getElementById('registerForm').classList.toggle('hidden', isLogin);
+            
+            document.getElementById('tabLoginBtn').className = isLogin 
+                ? 'flex-1 py-2 text-sm font-bold rounded-xl bg-white shadow-sm text-indigo-600 transition' 
+                : 'flex-1 py-2 text-sm font-bold rounded-xl text-slate-500 hover:text-indigo-600 transition';
+                
+            document.getElementById('tabRegisterBtn').className = !isLogin 
+                ? 'flex-1 py-2 text-sm font-bold rounded-xl bg-white shadow-sm text-indigo-600 transition' 
+                : 'flex-1 py-2 text-sm font-bold rounded-xl text-slate-500 hover:text-indigo-600 transition';
+
+            document.getElementById('authTitle').innerText = isLogin ? 'OnonoFixFlow' : 'สมัครสมาชิกผู้ใช้งาน';
+            document.getElementById('loginErrorMessage').classList.add('hidden');
+            document.getElementById('registerErrorMessage').classList.add('hidden');
+        }
+
+        async function handleLoginSubmit(e) {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            const errBox = document.getElementById('loginErrorMessage');
+            setLoading(true);
+            try {
+                const res = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'login', username, password })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    await initUserSession(data.user); // รอจนกว่า Session จะโหลดเสร็จ
+                } else {
+                    errBox.innerText = data.message || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
+                    errBox.classList.remove('hidden');
+                }
+            } catch (err) {
+                errBox.innerText = 'เชื่อมต่อฐานข้อมูลล้มเหลว: ' + err.message;
+                errBox.classList.remove('hidden');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function handleRegisterSubmit(e) {
+            e.preventDefault();
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+            const fullName = document.getElementById('regFullName').value.trim();
+            const department = document.getElementById('regDepartment').value.trim();
+            const phoneEl = document.getElementById('regPhone');
+            const phone = phoneEl ? phoneEl.value.trim() : '';
+            const role = document.getElementById('regRole').value;
+            const errBox = document.getElementById('registerErrorMessage');
+            setLoading(true);
+            try {
+                const res = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'register', username, password, fullName, department, phone, role })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    await initUserSession(data.user); // โหลดข้อมูลให้เสร็จก่อน
+                    showIosAlert('ลงทะเบียนสำเร็จ', 'ยินดีต้อนรับเข้าสู่ระบบ OnonoFixFlow', 'success'); // แสดง Pop-up ท้ายสุด
+                } else {
+                    errBox.innerText = data.message || 'ไม่สามารถลงทะเบียนได้';
+                    errBox.classList.remove('hidden');
+                }
+            } catch (err) {
+                errBox.innerText = 'เกิดข้อผิดพลาด: ' + err.message;
+                errBox.classList.remove('hidden');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        async function initUserSession(user) {
+            currentUser = user;
+            sessionStorage.setItem('onono_session', JSON.stringify(user));
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('userBadge').innerText = `${currentUser.role}: ${currentUser.fullName || currentUser.username}`;
+            if (document.getElementById('formReporter')) document.getElementById('formReporter').value = currentUser.fullName;
+            if (document.getElementById('formDepartment') && currentUser.department) document.getElementById('formDepartment').value = currentUser.department;
+            if (document.getElementById('withdrawUser')) document.getElementById('withdrawUser').value = currentUser.fullName;
+            applyUserRolePermissions();
+            await fetchAllData(); // เพิ่ม await ตรงนี้
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const saved = sessionStorage.getItem('onono_session');
+            if (saved) {
+                await initUserSession(JSON.parse(saved));
+            }
+        });
+
+        function logout() {
+            currentUser = null;
+            sessionStorage.removeItem('onono_session');
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('loginUsername').value = '';
+            document.getElementById('loginPassword').value = '';
+        }
+
+        function applyUserRolePermissions() {
+            const btnNewRepair = document.getElementById('btnOpenRepairModal');
+            const subTabAddStock = document.getElementById('subTabAddStock');
+            const reportsTabBtn = document.getElementById('reportsTab'); // อ้างอิงปุ่มเมนูรายงาน
+            
+            // สิทธิ์ปุ่มแจ้งซ่อม (ช่างซ่อมไม่เห็นปุ่มสร้างใบแจ้งใหม่)
+            if (currentUser.role === 'Maintenance') {
+                if(btnNewRepair) btnNewRepair.classList.add('hidden');
+            } else {
+                if(btnNewRepair) btnNewRepair.classList.remove('hidden');
+            }
+
+            // สิทธิ์รับเข้าอะไหล่ (เฉพาะ Admin)
+            if (currentUser.role !== 'Admin') {
+                if(subTabAddStock) subTabAddStock.classList.add('hidden');
+            } else {
+                if(subTabAddStock) subTabAddStock.classList.remove('hidden');
+            }
+
+            // สิทธิ์การเข้าถึงหน้ารายงาน (เฉพาะ Admin)
+            if (currentUser.role === 'Maintenance' || currentUser.role === 'User') {
+                if(reportsTabBtn) reportsTabBtn.classList.add('hidden');
+            } else {
+                if(reportsTabBtn) reportsTabBtn.classList.remove('hidden');
+            }
+        }
+
+        // ==========================================
+        // 3. API & Data Fetching
+        // ==========================================
+        async function fetchAPI(url, options = {}) {
+            const res = await fetch(url, options);
+            return await res.json();
+        }
+
+        async function fetchAllData() {
+            setLoading(true);
+            try {
+                const res = await fetchAPI(`${GAS_API_URL}?action=fetchAll`);
+                dataStore.machines = res.machines || [];
+                dataStore.department = res.department || [];
+                dataStore.spares = res.spares || [];
+                dataStore.requests = (res.requests || []).sort((a, b) => new Date(b.RequestDateTime) - new Date(a.RequestDateTime));
+                dataStore.transactions = res.transactions || [];
+
+                renderMachineOptions();
+                renderDepartmentOption();
+                renderRequestList();
+                renderSpareTable();
+                updateDashboardUI();
+                renderRecentDashboardList();
+            } catch (err) {
+                console.error("Fetch Data Error:", err);
+                showError("ไม่สามารถเชื่อมต่อฐานข้อมูล Google Sheet ได้");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function showTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    let targetId = tabName.endsWith('Content') ? tabName : tabName + 'Content';
+    const targetEl = document.getElementById(targetId);
+    if (targetEl) targetEl.classList.remove('hidden');
+    
+    document.querySelectorAll('nav button').forEach(b => {
+        b.classList.remove('glass-active');
+        b.classList.add('glass-nav-btn');
+    });
+    
+    const btnId = targetId.replace('Content', 'Tab');
+    const activeBtn = document.getElementById(btnId);
+    if (activeBtn) {
+        activeBtn.classList.add('glass-active');
+        activeBtn.classList.remove('glass-nav-btn');
+    }
+    
+    if (targetId === 'dashboardContent') {
+        updateDashboardUI();
+        renderRecentDashboardList();
+    }
+    if (targetId === 'inventoryContent') {
+        showInventorySubTab('stock');
+    }
+    // เพิ่มส่วนนี้: ให้แสดงเดือนปัจจุบันเป็นค่า Default เมื่อเปิดหน้ารายงาน
+    if (targetId === 'reportsContent') {
+        const today = new Date();
+        const yy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        document.getElementById('reportMonth').value = `${yy}-${mm}`; 
+    }
+}
+
+        function showInventorySubTab(subName) {
+            document.querySelectorAll('.inventory-sub-content').forEach(el => el.classList.add('hidden'));
+            const formattedName = subName.charAt(0).toUpperCase() + subName.slice(1);
+            const targetEl = document.getElementById('subContent' + formattedName);
+            if (targetEl) targetEl.classList.remove('hidden');
+
+            document.querySelectorAll('[id^="subTab"]').forEach(btn => {
+
+            document.querySelectorAll('[id^="subTab"]').forEach(btn => {
+                btn.classList.remove('glass-sub-active');
+                btn.classList.add('glass-sub-btn');
+            });
+            const activeBtn = document.getElementById('subTab' + formattedName);
+            if (activeBtn) {
+                activeBtn.classList.add('glass-sub-active');
+                activeBtn.classList.remove('glass-sub-btn');
+            }
+            });
+            const activeBtn = document.getElementById('subTab' + formattedName);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-white', 'shadow-sm', 'text-indigo-600');
+                activeBtn.classList.remove('text-slate-500');
+            }
+
+            if (subName === 'withdraw') updateWithdrawDropdown();
+            if (subName === 'history') renderHistoryTable();
+            if (subName === 'addStock') {
+                const c = document.getElementById('addStockContainer');
+                if (c && c.children.length === 0) addStockRow();
+            }
+        }
+
+        // ==========================================
+        // 5. Data Binding & UI Rendering
+        // ==========================================
+        function renderMachineOptions() {
+            const list = document.getElementById('machineOptions');
+            if(list) list.innerHTML = dataStore.machines.map(m => `<option value="${m.MachineCode}">${m.MachineType}</option>`).join('');
+        }
+
+        function renderDepartmentOption() {
+            const list = document.getElementById('departmentOptions');
+            if (list) list.innerHTML = dataStore.department.map(m => `<option value="${m.Department}">${m.Department}</option>`).join('');
+        }
+
+        function autoFillMachine() {
+            const code = document.getElementById('formMachineCode').value;
+            const match = dataStore.machines.find(m => m.MachineCode === code);
+            if (match) document.getElementById('formMachineType').value = match.MachineType || '';
+        }
+
+        function renderRequestList() {
+            const container = document.getElementById('requestDisplayList');
+            if (!container) return;
+            if (dataStore.requests.length === 0) {
+                container.innerHTML = `<p class="text-center py-10 text-gray-400 font-bold">ไม่มีรายการแจ้งซ่อม</p>`;
+                return;
+            }
+            container.innerHTML = dataStore.requests.map(r => {
+                const formatTime = (isoStr) => isoStr ? new Date(isoStr).toLocaleString('th-TH', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'}) : '-';
+                const statusBadge = r.Status === 'Completed' 
+                    ? '<span class="px-2 py-1 md:px-3 bg-emerald-100 text-emerald-600 rounded-full text-[10px] md:text-sm font-bold flex items-center gap-1"><i class="far fa-check-circle"></i> เสร็จสิ้น</span>'
+                    : `<span class="px-2 py-1 md:px-3 bg-blue-50 text-blue-600 rounded-full text-[10px] md:text-sm font-bold">${r.Status}</span>`;
+                return `
+                    <div class="relative bg-white border border-slate-100 rounded-[24px] shadow-sm hover:shadow-md transition-all p-4 md:p-5 mb-4 flex flex-col md:flex-row gap-4 md:gap-6">
+                        <div class="md:w-1/5 flex flex-col items-center justify-center border-b md:border-b-0 md:border-r border-slate-50 pb-4 md:pb-0 md:pr-4">
+                            <span class="text-[9px] md:text-[10px] font-bold text-blue-400 bg-blue-50 px-2 py-0.5 rounded-full mb-2 uppercase">${r.Urgency || 'Normal'}</span>
+                            <div class="w-12 h-12 md:w-16 md:h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-purple-600 mb-2 shadow-inner">
+                                <i class="fas fa-cog text-xl md:text-3xl"></i>
+                            </div>
+                            <h4 class="text-lg md:text-2xl font-black text-slate-800 leading-none text-center">${r.MachineCode}</h4>
+                            <p class="text-xs md:text-sm font-bold text-purple-600 mt-1 uppercase text-center">${r.MachineType || 'N/A'}</p>
+                            <p class="text-[10px] md:text-sm text-slate-300 mt-2 font-mono tracking-tighter">${r.RequestID}</p>
+                        </div>
+                        <div class="flex-1 space-y-3">
+                            <div class="flex justify-between items-start gap-2">
+                                <div class="space-y-1">
+                                    <p class="text-[10px] md:text-xs font-bold text-slate-400 uppercase">อาการที่พบ / ปัญหา</p>
+                                    <h3 class="text-base md:text-2xl font-bold text-slate-800 leading-tight">${r.Issue}</h3>
+                                </div>
+                                <div class="shrink-0">${statusBadge}</div>
+                            </div>
+                            <div class="grid grid-cols-3 gap-1 md:gap-2 py-2">
+                                <div>
+                                    <p class="text-[9px] md:text-xs font-bold text-slate-400 uppercase"><i class="fas fa-map-marker-alt mr-1"></i> แผนก</p>
+                                    <p class="text-xs md:text-base font-bold text-slate-700">${r.Department || '-'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] md:text-xs font-bold text-slate-400 uppercase"><i class="fas fa-user-edit mr-1"></i> ผู้แจ้ง</p>
+                                    <p class="text-xs md:text-base font-bold text-slate-700">${r.Reporter || '-'}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] md:text-xs font-bold text-blue-400 uppercase"><i class="fas fa-hard-hat mr-1"></i> ช่างรับผิดชอบ</p>
+                                    <p class="text-xs md:text-base font-bold text-blue-600">${r.AssignedTo || 'ยังไม่ระบุ'}</p>
+                                </div>
+                            </div>
+                            <div class="bg-amber-50/50 border border-amber-100 p-2 md:p-3 rounded-xl flex gap-2 items-start">
+                                <i class="far fa-comment-dots text-amber-500 mt-0.5 text-xs md:text-base"></i>
+                                <p class="text-[11px] md:text-sm text-amber-700 font-medium italic">
+                                    <span class="font-bold mr-1">หมายเหตุช่าง:</span> ${r.RepairNote || 'รอดำเนินการบำรุงรักษาตามอาการที่ได้รับแจ้ง'}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="md:w-1/4 bg-slate-50/50 rounded-2xl p-3 md:p-4 flex flex-col justify-between border border-slate-50 mt-2 md:mt-0">
+                            <div class="space-y-2">
+                                <div class="flex justify-between items-center text-[10px] md:text-sm border-b border-white pb-1">
+                                    <span class="text-slate-400 font-bold">เวลาแจ้ง:</span>
+                                    <span class="text-slate-700 font-black">${formatTime(r.RequestDateTime)}</span>
+                                </div>
+                                <div class="flex justify-between items-center text-[10px] md:text-sm border-b border-white pb-1">
+                                    <span class="text-slate-400 font-bold">เริ่มซ่อม:</span>
+                                    <span class="text-slate-700 font-black">${formatTime(r.AcceptedDateTime)}</span>
+                                </div>
+                                <div class="flex justify-between items-center text-[10px] md:text-sm">
+                                    <span class="text-slate-400 font-bold">เสร็จสิ้น:</span>
+                                    <span class="text-emerald-600 font-black">${formatTime(r.CompletedDateTime)}</span>
+                                </div>
+                            </div>
+                            <div class="flex gap-2 mt-3">
+                                ${r.Status === 'Pending' && (currentUser.role === 'Maintenance' || currentUser.role === 'Admin') ? `
+                                    <button onclick="toggleAcceptModal(true, '${r.RequestID}')" class="flex-1 py-2 md:py-3 bg-indigo-600 text-white rounded-xl text-xs md:text-base font-bold shadow-lg hover:bg-indigo-700 transition flex items-center justify-center gap-1 md:gap-2">
+                                        <i class="fas fa-wrench"></i> รับงาน
+                                    </button>` : ''}
+                                ${r.Status === 'In Progress' && (currentUser.role === 'User' || currentUser.role === 'Admin') ? `
+                                    <button onclick="handleCompleteButtonClick('${r.RequestID}')" class="flex-1 py-2 md:py-3 bg-emerald-600 text-white rounded-xl text-xs md:text-base font-bold shadow-lg hover:bg-emerald-700 active:scale-95 transition">
+                                        <i class="fas fa-check"></i> ปิดงาน
+                                    </button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function updateDashboardUI() {
+            const today = new Date().toISOString().split('T')[0];
+            const todayReqs = dataStore.requests.filter(r => (r.RequestDateTime || '').includes(today));
+            
+            document.getElementById('statTotal').innerText = todayReqs.length;
+            document.getElementById('statPending').innerText = todayReqs.filter(r => r.Status === 'Pending').length;
+            document.getElementById('statProgress').innerText = todayReqs.filter(r => r.Status === 'In Progress').length;
+            document.getElementById('statDone').innerText = todayReqs.filter(r => r.Status === 'Completed').length;
+            
+            renderDashboardChart(todayReqs);
+            renderTechStatus();
+        }
+
+        function renderTechStatus() {
+            const container = document.getElementById('techStatusContainer');
+            if (!container) return;
+            const activeTasks = dataStore.requests.filter(r => r.Status === 'In Progress' && r.AssignedTo);
+            const techMap = {};
+            activeTasks.forEach(r => {
+                if (!techMap[r.AssignedTo]) techMap[r.AssignedTo] = [];
+                techMap[r.AssignedTo].push(r.MachineCode);
+            });
+            const techNames = Object.keys(techMap);
+            if (techNames.length === 0) {
+                container.innerHTML = '<p class="text-slate-400 text-sm italic col-span-full text-center py-4">ไม่มีช่างที่กำลังปฏิบัติงานในขณะนี้</p>';
+                return;
+            }
+            container.innerHTML = techNames.map(name => `
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col items-center text-center">
+                    <div class="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mb-2 shadow-sm">
+                        <i class="fas fa-user-gear"></i>
+                    </div>
+                    <h5 class="text-lg font-bold text-slate-800">${name}</h5>
+                    <p class="text-[14px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+                        ONLINE: ${techMap[name].join(', ')}
+                    </p>
+                </div>
+            `).join('');
+        }
+
+        function renderDashboardChart(data) {
+            const ctx = document.getElementById('mainChart');
+            if(!ctx) return;
+            if (window.myChart) window.myChart.destroy();
+            window.myChart = new Chart(ctx.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: ['รอดำเนินการ', 'กำลังทำ', 'เสร็จสิ้น'],
+                    datasets: [{
+                        data: [
+                            data.filter(r => r.Status === 'Pending').length,
+                            data.filter(r => r.Status === 'In Progress').length,
+                            data.filter(r => r.Status === 'Completed').length
+                        ],
+                        backgroundColor: ['#fbbf24', '#3b82f6', '#22c55e']
+                    }]
+                },
+                options: { maintainAspectRatio: false }
+            });
+        }
+
+        function renderRecentDashboardList() {
+            const container = document.getElementById('recentList');
+            if (!container) return;
+            const recentData = dataStore.requests.slice(0, 5);
+            if (recentData.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-400 py-4 text-sm">ไม่มีรายการแจ้งซ่อม</p>';
+                return;
+            }
+            container.innerHTML = recentData.map(r => `
+                <div class="flex items-center gap-4 p-3 rounded-2xl hover:bg-slate-50 transition border border-transparent hover:border-slate-100">
+                    <div class="w-2 h-10 rounded-full ${r.Urgency === 'Critical' ? 'bg-red-500' : 'bg-purple-400'}"></div>
+                    <div class="flex-1 min-w-0">
+                        <h5 class="text-sm font-bold text-slate-800 truncate">${r.MachineCode}</h5>
+                        <p class="text-[11px] text-gray-500 truncate">${r.Issue}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] font-bold ${r.Status === 'Pending' ? 'text-red-500' : 'text-green-500'} uppercase">${r.Status}</span>
+                        <p class="text-[9px] text-gray-400">${new Date(r.RequestDateTime).toLocaleTimeString('th-TH', {hour:'2-digit', minute:'2-digit'})}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderSpareTable() {
+            const tbody = document.getElementById('spareTableBody');
+            if (!tbody) return;
+            tbody.innerHTML = dataStore.spares.map(item => {
+                const isLow = Number(item.StockQty) <= Number(item.MinStock || 0);
+                return `
+                    <tr class="hover:bg-blue-50/50 transition cursor-default whitespace-nowrap">
+                        <td class="px-3 py-2 md:px-6 md:py-4 font-bold text-blue-600">${item.PartID}</td>
+                        <td class="px-3 py-2 md:px-6 md:py-4 text-gray-700 whitespace-normal min-w-[150px] md:min-w-[auto]">${item.PartName}</td>
+                        <td class="px-3 py-2 md:px-6 md:py-4 text-center font-semibold ${isLow ? 'text-red-600' : 'text-slate-700'}">
+                            ${Number(item.StockQty).toLocaleString()}
+                        </td>
+                        <td class="px-3 py-2 md:px-6 md:py-4 text-gray-500">${item.Unit || '-'}</td>
+                        <td class="px-3 py-2 md:px-6 md:py-4">
+                            ${isLow 
+                                ? '<span class="px-2 py-1 md:px-3 bg-red-100 text-red-600 rounded-full text-[9px] md:text-[13px] font-bold tracking-wider animate-pulse uppercase">ควรสั่งซื้อเพิ่ม</span>' 
+                                : '<span class="px-2 py-1 md:px-3 bg-green-100 text-green-600 rounded-full text-[9px] md:text-[13px] font-bold tracking-wider uppercase">ปกติ</span>'
+                            }
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function filterSpares() {
+            const input = document.getElementById('spareSearch');
+            const filter = input.value.toLowerCase();
+            document.querySelectorAll('#spareTableBody tr').forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(filter) ? '' : 'none';
+            });
+        }
+
+        // ==========================================
+        // 6. Actions (แจ้งซ่อม, รับงาน, ปิดงาน)
+        // ==========================================
+        function toggleRepairModal(show) {
+            document.getElementById('repairModal').classList.toggle('hidden', !show);
+        }
+
+        async function handleRequestSubmit(e) {
+            e.preventDefault();
+            setLoading(true);
+            const payload = {
+                MachineCode: document.getElementById('formMachineCode').value,
+                MachineType: document.getElementById('formMachineType').value,
+                Department: document.getElementById('formDepartment').value,
+                Issue: document.getElementById('formIssue').value,
+                Urgency: document.getElementById('formUrgency').value,
+                Reporter: document.getElementById('formReporter').value,
+                Status: 'Pending',
+                RequestDateTime: new Date().toISOString()
+            };
+            try {
+                const res = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'createRequest', payload })
+                });
+                const data = await res.json();
+                e.target.reset();
+                toggleRepairModal(false);
+                
+                await fetchAllData(); // อัปเดตข้อมูล
+                showIosAlert('ส่งซ่อมสำเร็จ!', `สร้างใบแจ้งซ่อมเลขที่: ${data.newId}`, 'success'); // Pop-up ท้ายสุด
+            } catch (err) {
+                showError("เกิดข้อผิดพลาด: " + err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function toggleAcceptModal(show, requestId = null) {
+            const modal = document.getElementById('acceptTaskModal');
+            if (show) {
+                document.getElementById('pendingAcceptId').value = requestId;
+                document.getElementById('techNameInput').value = currentUser.fullName || currentUser.username;
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        async function confirmAcceptTask() {
+            const requestId = document.getElementById('pendingAcceptId').value;
+            const techName = document.getElementById('techNameInput').value.trim();
+            if (!techName) return showError('กรุณาระบุชื่อช่าง');
+            setLoading(true);
+            try {
+                await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'acceptTask', requestId, techName })
+                });
+                toggleAcceptModal(false);
+                
+                await fetchAllData();
+                showSuccess('รับงานสำเร็จ!', 'ระบบบันทึกเวลาเริ่มซ่อมเรียบร้อยแล้ว');
+            } catch (err) {
+                showError("เกิดข้อผิดพลาด: " + err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function handleCompleteButtonClick(requestId) {
+            toggleCompleteModal(true, requestId);
+        }
+
+        function toggleCompleteModal(show, requestId = null) {
+            const modal = document.getElementById('completeTaskModal');
+            if (show) {
+                document.getElementById('pendingCompleteId').value = requestId;
+                document.getElementById('closeTaskNote').value = '';
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        async function confirmCompleteTask() {
+            const requestId = document.getElementById('pendingCompleteId').value;
+            const note = document.getElementById('closeTaskNote').value.trim() || 'ซ่อมเสร็จสิ้นตามอาการ';
+            setLoading(true);
+            try {
+                await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'completeTask', requestId, note })
+                });
+                toggleCompleteModal(false);
+                
+                await fetchAllData();
+                showSuccess('ปิดงานเรียบร้อย!', 'บันทึกเวลาสำเร็จงานแล้ว');
+            } catch (err) {
+                showError("เกิดข้อผิดพลาด: " + err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // ==========================================
+        // 7. ระบบจัดการคลังอะไหล่ (Inventory Parts)
+        // ==========================================
+        function addSpareRow() {
+            const container = document.getElementById('spareItemsContainer');
+            const rowId = Date.now();
+            const div = document.createElement('div');
+            div.className = "flex flex-col md:flex-row gap-2 md:gap-3 items-start md:items-center bg-slate-50/50 p-3 rounded-2xl border border-slate-100 animate-fadeIn";
+            div.id = `row-${rowId}`;
+            div.innerHTML = `
+                <select class="spare-select w-full md:flex-1 p-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-orange-400" required>
+                    <option value="">-- เลือกอะไหล่ --</option>
+                    ${dataStore.spares.map(s => `<option value="${s.PartID}" data-stock="${s.StockQty}">${s.PartName} (เหลือ: ${s.StockQty})</option>`).join('')}
+                </select>
+                <div class="flex w-full md:w-auto gap-2 items-center justify-between">
+                    <input type="number" class="spare-qty w-full md:w-32 p-3 bg-white border border-gray-200 rounded-xl outline-none text-center focus:ring-2 focus:ring-orange-400" placeholder="ระบุจำนวน" min="1" required>
+                    <button type="button" onclick="document.getElementById('row-${rowId}').remove()" class="text-red-400 hover:text-red-600 p-2 bg-red-50 rounded-xl">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        function updateWithdrawDropdown() {
+            const select = document.getElementById('withdrawRequestID');
+            const active = dataStore.requests.filter(r => r.Status !== 'Completed');
+            select.innerHTML = '<option value="">-- เลือกรายการแจ้งซ่อม --</option>' + 
+                active.map(r => `<option value="${r.RequestID}">${r.RequestID} | ${r.MachineCode} (${r.Status})</option>`).join('');
+            document.getElementById('withdrawUser').value = currentUser.fullName || currentUser.username;
+            if (document.getElementById('spareItemsContainer').children.length === 0) addSpareRow();
+        }
+
+        async function handleWithdrawSubmit(e) {
+            e.preventDefault();
+            setLoading(true);
+            const requestId = document.getElementById('withdrawRequestID').value;
+            const user = document.getElementById('withdrawUser').value;
+            const remark = document.getElementById('withdrawRemark').value;
+            const rows = document.querySelectorAll('#spareItemsContainer > div');
+            const items = [];
+            try {
+                if (rows.length === 0) throw new Error('กรุณาเพิ่มรายการอะไหล่');
+                for (let row of rows) {
+                    const sel = row.querySelector('.spare-select');
+                    const qty = parseInt(row.querySelector('.spare-qty').value);
+                    const partId = sel.value;
+                    if (!partId || isNaN(qty)) continue;
+                    const curStock = parseInt(sel.selectedOptions[0].getAttribute('data-stock'));
+                    if (qty > curStock) throw new Error(`อะไหล่ ${partId} คงเหลือไม่พอ`);
+                    items.push({ PartID: partId, Qty: qty });
+                }
+                const res = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'withdraw', requestId, user, remark, items })
+                });
+                const data = await res.json();
+                const printData = {
+                    TransactionID: data.newId,
+                    RequestID: requestId,
+                    User: user,
+                    Items: items,
+                    Remark: remark,
+                    Date: new Date().toLocaleString('th-TH')
+                };
+                
+                document.getElementById('spareItemsContainer').innerHTML = '';
+                e.target.reset();
+                
+                await fetchAllData(); // ดึงข้อมูลให้เสร็จก่อน
+                showSuccess('เบิกอะไหล่สำเร็จ!', `สร้างใบเบิกเลขที่: ${data.newId}`, printData); // แสดง Modal
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function addStockRow() {
+            const container = document.getElementById('addStockContainer');
+            const rowId = Date.now();
+            const div = document.createElement('div');
+            div.className = "flex flex-col md:flex-row gap-2 md:gap-3 items-start md:items-center p-3 bg-slate-50 rounded-2xl border border-gray-100 animate-fadeIn";
+            div.id = `add-row-${rowId}`;
+            div.innerHTML = `
+                <select class="add-spare-select w-full md:flex-1 p-3 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-green-400" required>
+                    <option value="">-- เลือกอะไหล่ --</option>
+                    ${dataStore.spares.map(s => `<option value="${s.PartID}">${s.PartName}</option>`).join('')}
+                </select>
+                <div class="flex w-full md:w-auto gap-2 items-center justify-between">
+                    <input type="number" class="add-spare-qty w-full md:w-32 p-3 bg-white border border-gray-200 rounded-xl outline-none text-center focus:ring-2 focus:ring-green-400" placeholder="ระบุจำนวน" min="1" required>
+                    <button type="button" onclick="this.closest('div[id^=\\'add-row\\']').remove()" class="text-red-400 hover:text-red-600 p-2 bg-red-50 rounded-xl">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            container.appendChild(div);
+        }
+
+        async function handleAddStockSubmit(e) {
+            e.preventDefault();
+            setLoading(true);
+            const rows = document.querySelectorAll('#addStockContainer > div');
+            const ref = document.getElementById('addStockRef').value;
+            const remark = document.getElementById('addStockRemark').value;
+            const items = [];
+            try {
+                rows.forEach(r => {
+                    const partId = r.querySelector('.add-spare-select').value;
+                    const qty = parseInt(r.querySelector('.add-spare-qty').value);
+                    if (partId && qty > 0) items.push({ PartID: partId, Qty: qty });
+                });
+                const res = await fetch(GAS_API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'addStock', ref, remark, items })
+                });
+                const data = await res.json();
+                
+                document.getElementById('addStockContainer').innerHTML = '';
+                document.getElementById('addStockRemark').value = '';
+                e.target.reset();
+                
+                await fetchAllData(); // ดึงข้อมูลให้เสร็จก่อน
+                showIosAlert('นำเข้าสำเร็จ!', `เอกสารรับเข้าเลขที่: ${data.newId}`, 'success'); // แสดง Modal
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // ==========================================
+        // อัปเดตตารางประวัติให้มีปุ่มพิมพ์
+        // ==========================================
+        async function renderHistoryTable() {
+            const tbody = document.getElementById('historyTableBody');
+            if (!tbody) return;
+            const trans = dataStore.transactions || [];
+            if (trans.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-slate-400 text-sm">ไม่พบประวัติการทำรายการ</td></tr>';
+                return;
+            }
+            let html = '';
+            trans.forEach(t => {
+                const date = new Date(t.created_at).toLocaleString('th-TH');
+                const isAdd = t.TransactionType === 'Add';
+                const items = Array.isArray(t.SpareItems) ? t.SpareItems : [];
+                // เตรียมข้อมูลเป็น JSON String สำหรับส่งไปพิมพ์
+                const printData = JSON.stringify({
+                    TransactionID: t.TransactionID || '-',
+                    RequestID: t.RequestID,
+                    User: t.User,
+                    Items: items,
+                    Date: date,
+                    Type: t.TransactionType,
+                    Remark: t.Remark || '-'
+                }).replace(/"/g, '&quot;');
+
+                items.forEach((item, index) => {
+                    const spare = dataStore.spares.find(s => s.PartID === item.PartID) || {};
+                    html += `
+                        <tr class="hover:bg-gray-50 transition border-b border-gray-50 whitespace-nowrap">
+                            <td class="px-3 py-3 md:px-6 md:py-4 text-gray-400 text-[10px] md:text-sm">${date}</td>
+                            <td class="px-3 py-3 md:px-6 md:py-4">
+                                <span class="px-2 py-1 md:px-3 md:py-1.5 rounded-full text-[9px] md:text-[12px] font-bold tracking-wider ${isAdd ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}">
+                                    ${isAdd ? 'นำเข้า' : 'เบิกออก'}
+                                </span>
+                            </td>
+                            <td class="px-3 py-3 md:px-6 md:py-4 font-medium text-slate-700 text-[11px] md:text-sm">
+                                ${t.RequestID}<br>
+                                <span class="text-[9px] md:text-xs text-slate-400 font-normal">${t.User || '-'}</span>
+                            </td>
+                            <td class="px-3 py-3 md:px-6 md:py-4 font-mono text-blue-600 font-bold text-[11px] md:text-sm">${item.PartID}</td>
+                            <td class="px-3 py-3 md:px-6 md:py-4 text-slate-600 text-[11px] md:text-sm whitespace-normal min-w-[120px] md:min-w-auto leading-tight">${spare.PartName || '-'}</td>
+                            <td class="px-3 py-3 md:px-6 md:py-4 text-center font-bold ${isAdd ? 'text-green-600' : 'text-orange-600'} text-[11px] md:text-sm">
+                                ${isAdd ? '+' : '-'}${item.Qty}
+                            </td>
+                            <td class="px-3 py-3 md:px-6 md:py-4 text-gray-500 text-[11px] md:text-sm">${spare.Unit || '-'}</td>
+                            <td class="px-3 py-3 md:px-6 md:py-4 text-center">
+                                ${index === 0 ? `
+                                    <button onclick="rePrintTransaction('${printData}')" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 md:px-3 md:py-1.5 rounded-lg transition font-bold text-[10px] md:text-sm flex items-center justify-center gap-1 mx-auto shadow-sm">
+                                        <i class="fas fa-print"></i> <span class="hidden md:inline">พิมพ์</span>
+                                    </button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+            tbody.innerHTML = html;
+        }
+
+        // ==========================================
+        // ฟังก์ชันสั่งพิมพ์เอกสารย้อนหลัง (แยกประเภทเบิก/รับเข้า)
+        // ==========================================
+        function rePrintTransaction(jsonString) {
+            const data = JSON.parse(jsonString);
+            
+            // สร้างตารางรายการอะไหล่
+            const itemsHtml = (data.Items || []).map(item => {
+                const spare = dataStore.spares.find(s => s.PartID === item.PartID) || {};
+                return `
+                    <tr>
+                        <td style="border:1px solid #ddd; padding:8px;">${item.PartID}</td>
+                        <td style="border:1px solid #ddd; padding:8px;">${spare.PartName || '-'}</td>
+                        <td style="border:1px solid #ddd; padding:8px; text-align:center;">${item.Qty}</td>
+                        <td style="border:1px solid #ddd; padding:8px;">${spare.Unit || '-'}</td>
+                    </tr>`;
+            }).join('');
+
+            let htmlContent = '';
+
+            if (data.Type === 'Withdraw') {
+                const req = dataStore.requests.find(r => r.RequestID === data.RequestID) || {};
+                htmlContent = `
+                    <html>
+                    <head>
+                        <title>ใบเบิกอะไหล่ - ${data.TransactionID || data.RequestID}</title>
+                        <style>
+                            body { font-family: 'Tahoma', sans-serif; padding: 30px; color: #333; }
+                            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                            @media print { body { padding: 0; } }
+                            .info-group div { margin-bottom: 8px; font-size: 15px; }
+                        </style>
+                    </head>
+                    <body>
+                        <h2 style="text-align:center">THAI ONONO PUBLIC CO.,LTD.</h2>
+                        <h3 style="text-align:center;margin-top:-10px">ใบเบิกอะไหล่ (Spare Parts Issue Slip)</h3>
+                        <div style="float:right; font-weight:bold;">[ พิมพ์ย้อนหลัง ]</div>
+                        <div class="info-group">
+                          <div><strong>เลขที่ใบเบิก:</strong> ${data.TransactionID || '-'}</div>
+                          <div><strong>อ้างอิงใบแจ้งซ่อม:</strong> ${data.RequestID || '-'}</div>
+                          <div><strong>วันที่เบิก:</strong> ${data.Date || '-'}</div>
+                          <div><strong>เครื่องจักร:</strong> ${req.MachineCode || '-'}</div>
+                          <div><strong>ผู้ขอเบิก:</strong> ${data.User || '-'}</div>
+                        </div>
+                        <table>
+                            <thead>
+                                <tr style="background:#f8f9fa">
+                                    <th style="border:1px solid #ddd;padding:8px">รหัส</th>
+                                    <th style="border:1px solid #ddd;padding:8px">รายการ</th>
+                                    <th style="border:1px solid #ddd;padding:8px">จำนวน</th>
+                                    <th style="border:1px solid #ddd;padding:8px">หน่วย</th>
+                                </tr>
+                            </thead>
+                            <tbody>${itemsHtml}</tbody>
+                        </table>
+                        <p><strong>หมายเหตุ:</strong> ${data.Remark || '-'}</p>
+                        <div style="margin-top:50px; display:flex; justify-content:space-between; text-align:center;">
+                            <div style="width:200px;">___________________<br>ผู้เบิก</div>
+                            <div style="width:200px;">___________________<br>หัวหน้าแผนก</div>
+                            <div style="width:200px;">___________________<br>ผู้อนุมัติ</div>
+                        </div>
+                    </body>
+                    </html>
+                `;
+            } else {
+                htmlContent = `
+                    <html>
+                    <head>
+                        <title>ใบรับเข้าอะไหล่ - ${data.TransactionID || data.RequestID}</title>
+                        <style>
+                            body { font-family: 'Tahoma', sans-serif; padding: 30px; color: #333; }
+                            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                            @media print { body { padding: 0; } }
+                        </style>
+                    </head>
+                    <body>
+                        <h2 style="text-align:center">THAI ONONO PUBLIC CO.,LTD.</h2>
+                        <h3 style="text-align:center;margin-top:-10px;color:#059669">ใบรับเข้าอะไหล่ (Spare Parts Receiving Slip)</h3>
+                        <div style="float:right; font-weight:bold; color:#059669;">[ พิมพ์ย้อนหลัง ]</div>
+                        <div><strong>เลขที่เอกสารรับเข้า:</strong> ${data.TransactionID || '-'}</div>
+                        <div><strong>อ้างอิง (PO/บุคคล):</strong> ${data.RequestID || '-'}</div>
+                        <div><strong>วันที่รับเข้า:</strong> ${data.Date || '-'}</div>
+                        <div><strong>ผู้บันทึก:</strong> ${data.User || '-'}</div>
+                        <table>
+                            <thead>
+                                <tr style="background:#ecfdf5">
+                                    <th style="border:1px solid #ddd;padding:8px">รหัส</th>
+                                    <th style="border:1px solid #ddd;padding:8px">รายการ</th>
+                                    <th style="border:1px solid #ddd;padding:8px">จำนวน</th>
+                                    <th style="border:1px solid #ddd;padding:8px">หน่วย</th>
+                                </tr>
+                            </thead>
+                            <tbody>${itemsHtml}</tbody>
+                        </table>
+                        <p><strong>หมายเหตุ:</strong> ${data.Remark || '-'}</p>
+                        <div style="margin-top:50px; display:flex; justify-content:space-around; text-align:center;">
+                            <div style="width:200px;">___________________<br>ผู้ส่งมอบ / ผู้นำเข้า</div>
+                            <div style="width:200px;">___________________<br>ผู้รับของเข้าคลัง</div>
+                        </div>
+                    </body>
+                    </html>
+                `;
+            }
+
+            // ส่งข้อมูลไปยังฟังก์ชันพิมพ์ Iframe ที่มีอยู่แล้ว
+            printViaIframe(htmlContent);
+        }
+
+        // ==========================================
+        // 8. Helpers, Modals & Printing
+        // ==========================================
+        function setLoading(v) { 
+            const overlay = document.getElementById('loadingOverlay');
+            if(overlay) overlay.style.display = v ? 'flex' : 'none'; 
+        }
+
+        function showSuccess(title, message, data = null) {
+            document.getElementById('successTitle').innerText = title;
+            document.getElementById('successMessage').innerText = message;
+            const btn = document.getElementById('btnPrintSlip');
+            if (data) {
+                btn.classList.remove('hidden');
+                btn.onclick = () => printWithdrawSlip(data);
+            } else {
+                btn.classList.add('hidden');
+            }
+            document.getElementById('successModal').classList.remove('hidden');
+        }
+
+        function closeSuccessModal() { 
+            document.getElementById('successModal').classList.add('hidden'); 
+        }
+
+        // ฟังก์ชันเปิด Alert แบบ iOS 18 Glassmorphism
+function showIosAlert(title, message, type = 'success') {
+    const modal = document.getElementById('iosAlertModal');
+    const iconContainer = document.getElementById('iosAlertIcon');
+    
+    document.getElementById('iosAlertTitle').innerText = title;
+    document.getElementById('iosAlertMessage').innerText = message;
+    
+    // สลับสีและไอคอนตามประเภท (success, error, info)
+    if (type === 'success') {
+        iconContainer.className = 'w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center text-3xl shadow-sm bg-emerald-100/80 text-emerald-500 border border-white';
+        iconContainer.innerHTML = '<i class="fas fa-check"></i>';
+    } else if (type === 'error') {
+        iconContainer.className = 'w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center text-3xl shadow-sm bg-red-100/80 text-red-500 border border-white';
+        iconContainer.innerHTML = '<i class="fas fa-exclamation"></i>';
+    } else {
+        iconContainer.className = 'w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center text-3xl shadow-sm bg-blue-100/80 text-blue-500 border border-white';
+        iconContainer.innerHTML = '<i class="fas fa-info"></i>';
+    }
+    
+    modal.classList.remove('hidden');
+}
+
+// ฟังก์ชันปิด Alert
+function closeIosAlert() {
+    document.getElementById('iosAlertModal').classList.add('hidden');
+}
+
+function showError(msg) { 
+    showIosAlert('เกิดข้อผิดพลาด', msg, 'error'); 
+}
+
+function showStatDetail(status) {
+            const tbody = document.getElementById('statDetailTableBody');
+            const title = document.getElementById('statModalTitle');
+            const today = new Date().toISOString().split('T')[0]; // ดึงวันที่ปัจจุบัน
+            let filtered = [];
+
+            if (status === 'All') {
+                title.innerText = "รายการแจ้งซ่อมทั้งหมด (วันนี้)";
+                filtered = dataStore.requests.filter(r => (r.RequestDateTime || '').startsWith(today));
+            } else {
+                title.innerText = `รายการสถานะ: ${status} (วันนี้)`;
+                // เพิ่มเงื่อนไขให้กรองวันที่ปัจจุบันสำหรับทุกสถานะ
+                filtered = dataStore.requests.filter(r => r.Status === status && (r.RequestDateTime || '').startsWith(today));
+            }
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-10 text-center text-slate-400 text-sm">ไม่พบรายการข้อมูลของวันนี้</td></tr>`;
+            } else {
+                tbody.innerHTML = filtered.map(r => `
+                    <tr class="hover:bg-slate-50 transition-colors border-b border-slate-50">
+                        <td class="px-3 py-3 md:px-6 md:py-4 text-[10px] md:text-sm text-slate-600 whitespace-nowrap">${new Date(r.RequestDateTime).toLocaleString('th-TH')}</td>
+                        <td class="px-3 py-3 md:px-6 md:py-4 font-bold text-slate-700 text-[11px] md:text-sm whitespace-nowrap">${r.MachineCode}</td>
+                        <td class="px-3 py-3 md:px-6 md:py-4 text-[11px] md:text-sm text-slate-600 whitespace-normal min-w-[120px] md:min-w-auto leading-tight">${r.Issue}</td>
+                        <td class="px-3 py-3 md:px-6 md:py-4 font-bold text-indigo-600 text-[10px] md:text-sm text-center whitespace-nowrap">${r.Status}</td>
+                    </tr>
+                `).join('');
+            }
+            document.getElementById('statDetailModal').classList.remove('hidden');
+        }
+
+        function toggleStatModal(show) { 
+            document.getElementById('statDetailModal').classList.toggle('hidden', !show); 
+        }
+
+        // ==========================================
+        // ฟังก์ชันพิมพ์ใบเบิกอะไหล่ (แก้ปัญหา Popup Block)
+        // ==========================================
+        function printWithdrawSlip(data) {
+            const req = dataStore.requests.find(r => r.RequestID === data.RequestID) || {};
+            const itemsRows = (data.Items || []).map(i => {
+                const sp = dataStore.spares.find(s => s.PartID === i.PartID) || {};
+                return `<tr><td style="border:1px solid #ddd;padding:8px;">${i.PartID}</td><td style="border:1px solid #ddd;padding:8px;">${sp.PartName || '-'}</td><td style="border:1px solid #ddd;padding:8px;text-align:center;">${i.Qty}</td><td style="border:1px solid #ddd;padding:8px;">${sp.Unit || '-'}</td></tr>`;
+            }).join('');
+
+            const htmlContent = `
+                <html>
+                <head>
+                    <title>ใบเบิกอะไหล่ - ${data.TransactionID || data.RequestID}</title>
+                    <style>
+                        body { font-family: 'Tahoma', sans-serif; padding: 30px; color: #333; }
+                        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                        @media print { body { padding: 0; } }
+                        .info-group div { margin-bottom: 8px; font-size: 15px; }
+                    </style>
+                </head>
+                <body>
+                    <h2 style="text-align:center">THAI ONONO PUBLIC CO.,LTD.</h2>
+                    <h3 style="text-align:center;margin-top:-10px">ใบเบิกอะไหล่ (Spare Parts Issue Slip)</h3>
+                    <div class="info-group">
+                      <div><strong>เลขที่ใบเบิก:</strong> ${data.TransactionID || '-'}</div>
+                      <div><strong>อ้างอิงใบแจ้งซ่อม:</strong> ${data.RequestID || '-'}</div>
+                      <div><strong>วันที่เบิก:</strong> ${data.Date || '-'}</div>
+                      <div><strong>เครื่องจักร:</strong> ${req.MachineCode || '-'}</div>
+                      <div><strong>ผู้ขอเบิก:</strong> ${data.User || '-'}</div>
+                  </div>
+                    <table>
+                        <thead>
+                            <tr style="background:#f8f9fa">
+                                <th style="border:1px solid #ddd;padding:8px">รหัส</th>
+                                <th style="border:1px solid #ddd;padding:8px">รายการ</th>
+                                <th style="border:1px solid #ddd;padding:8px">จำนวน</th>
+                                <th style="border:1px solid #ddd;padding:8px">หน่วย</th>
+                            </tr>
+                        </thead>
+                        <tbody>${itemsRows}</tbody>
+                    </table>
+                    <p><strong>หมายเหตุ:</strong> ${data.Remark || '-'}</p>
+                    <div style="margin-top:50px; display:flex; justify-content:space-between; text-align:center;">
+                        <div style="width:200px;">___________________<br>ผู้เบิก</div>
+                        <div style="width:200px;">___________________<br>หัวหน้าแผนก</div>
+                        <div style="width:200px;">___________________<br>ผู้อนุมัติ</div>
+                    </div>
+                </body>
+                </html>
+            `;
+
+            printViaIframe(htmlContent);
+        }
+
+        async function generateReport() {
+    const type = document.getElementById('reportType').value;
+    const monthVal = document.getElementById('reportMonth').value; // จะได้ค่าเช่น "2026-09"
+    const resDiv = document.getElementById('reportResult');
+    
+    if (!monthVal && type !== 'inventory') {
+        showIosAlert('แจ้งเตือน', 'กรุณาเลือกเดือน', 'info');
+        return;
+    }
+
+    // แปลงชื่อเดือนสำหรับแสดงผล
+    const monthText = monthVal ? new Date(monthVal + '-01').toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }) : '';
+    resDiv.innerHTML = '<div class="flex justify-center items-center h-40"><i class="fas fa-spinner fa-spin fa-2x text-indigo-500"></i></div>';
+
+    setTimeout(() => {
+        let html = '';
+        
+        if (type === 'inventory') {
+            html = `
+                <h3 class="text-lg font-bold mb-4 text-indigo-700">รายงานสรุปยอดสต็อกคงเหลือ (ข้อมูลล่าสุด)</h3>
+                <table class="w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600">
+                            <th class="p-3 text-left border border-slate-200">รหัส</th>
+                            <th class="p-3 text-left border border-slate-200">รายการ</th>
+                            <th class="p-3 text-center border border-slate-200">คงเหลือ</th>
+                            <th class="p-3 text-center border border-slate-200">จุดสั่งซื้อ (Min)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${dataStore.spares.map(s => `
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3 border border-slate-200 font-bold text-blue-600">${s.PartID}</td>
+                                <td class="p-3 border border-slate-200">${s.PartName}</td>
+                                <td class="p-3 text-center font-bold border border-slate-200 ${Number(s.StockQty) <= Number(s.MinStock) ? 'text-red-500 bg-red-50' : 'text-slate-700'}">${s.StockQty}</td>
+                                <td class="p-3 text-center border border-slate-200 text-slate-500">${s.MinStock || '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        } 
+        else if (type === 'maintenance') {
+            // กรองเฉพาะงานแจ้งซ่อมที่ขึ้นต้นด้วยเดือนที่เลือก
+            const filtered = dataStore.requests.filter(r => r.RequestDateTime && r.RequestDateTime.startsWith(monthVal));
+            html = `
+                <h3 class="text-lg font-bold mb-4 text-indigo-700">รายงานประวัติการซ่อม ประจำเดือน ${monthText} (รวม ${filtered.length} รายการ)</h3>
+                <div class="overflow-x-auto pb-4 custom-scrollbar">
+                    <table class="w-full text-[12px] border-collapse whitespace-nowrap min-w-[1200px]">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600">
+                                <th class="p-2 text-left border border-slate-200">วันที่แจ้ง</th>
+                                <th class="p-2 text-left border border-slate-200">เลขที่ใบแจ้ง</th>
+                                <th class="p-2 text-left border border-slate-200">แผนก</th>
+                                <th class="p-2 text-left border border-slate-200">เครื่องจักร</th>
+                                <th class="p-2 text-left border border-slate-200">ประเภทจักร</th>
+                                <th class="p-2 text-left border border-slate-200">ผู้แจ้งซ่อม</th>
+                                <th class="p-2 text-left border border-slate-200 min-w-[150px]">อาการเสีย</th>
+                                <th class="p-2 text-center border border-slate-200">เวลาแจ้ง</th>
+                                <th class="p-2 text-left border border-slate-200">ช่างผู้ซ่อม</th>
+                                <th class="p-2 text-center border border-slate-200">เริ่มซ่อม</th>
+                                <th class="p-2 text-center border border-slate-200">ซ่อมเสร็จ</th>
+                                <th class="p-2 text-center border border-slate-200">สถานะ</th>
+                                <th class="p-2 text-left border border-slate-200 min-w-[150px]">หมายเหตุ</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${filtered.length === 0 ? `<tr><td colspan="13" class="p-4 text-center text-slate-400">ไม่มีข้อมูลในเดือนนี้</td></tr>` : 
+                            filtered.map(r => {
+                                const formatTime = (iso) => iso ? new Date(iso).toLocaleTimeString('th-TH', {hour: '2-digit', minute: '2-digit'}) : '-';
+                                const formatDate = (iso) => iso ? new Date(iso).toLocaleDateString('th-TH') : '-';
+                                return `
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="p-2 border border-slate-200">${formatDate(r.RequestDateTime)}</td>
+                                        <td class="p-2 border border-slate-200 font-bold">${r.RequestID || '-'}</td>
+                                        <td class="p-2 border border-slate-200">${r.Department || '-'}</td>
+                                        <td class="p-2 border border-slate-200 text-blue-600 font-bold">${r.MachineCode || '-'}</td>
+                                        <td class="p-2 border border-slate-200">${r.MachineType || '-'}</td>
+                                        <td class="p-2 border border-slate-200">${r.Reporter || '-'}</td>
+                                        <td class="p-2 border border-slate-200 whitespace-normal">${r.Issue || '-'}</td>
+                                        <td class="p-2 text-center border border-slate-200">${formatTime(r.RequestDateTime)}</td>
+                                        <td class="p-2 border border-slate-200 text-indigo-600">${r.AssignedTo || '-'}</td>
+                                        <td class="p-2 text-center border border-slate-200">${formatTime(r.AcceptedDateTime)}</td>
+                                        <td class="p-2 text-center border border-slate-200">${formatTime(r.CompletedDateTime)}</td>
+                                        <td class="p-2 text-center border border-slate-200 font-bold ${r.Status === 'Completed' ? 'text-green-600' : 'text-orange-500'}">${r.Status || '-'}</td>
+                                        <td class="p-2 border border-slate-200 whitespace-normal text-slate-500">${r.RepairNote || '-'}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+        else {
+            // กรณีเป็นรายงานเบิกอะไหล่ หรือ รับเข้าอะไหล่
+            const txType = type === 'withdraw' ? 'Withdraw' : 'Add';
+            const titleText = type === 'withdraw' ? 'สรุปการเบิกใช้อะไหล่' : 'สรุปการรับเข้าอะไหล่';
+            const filtered = dataStore.transactions.filter(t => t.TransactionType === txType && t.created_at && t.created_at.startsWith(monthVal));
+            
+            html = `
+                <h3 class="text-lg font-bold mb-4 text-indigo-700">รายงาน${titleText} ประจำเดือน ${monthText}</h3>
+                <table class="w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-600">
+                            <th class="p-3 text-left border border-slate-200">วันที่</th>
+                            <th class="p-3 text-left border border-slate-200">เลขที่อ้างอิง</th>
+                            <th class="p-3 text-left border border-slate-200">รหัสอะไหล่</th>
+                            <th class="p-3 text-left border border-slate-200">ชื่อรายการ</th>
+                            <th class="p-3 text-center border border-slate-200">จำนวน</th>
+                            <th class="p-3 text-left border border-slate-200">ผู้ทำรายการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${filtered.length === 0 ? `<tr><td colspan="6" class="p-4 text-center text-slate-400">ไม่มีข้อมูลในเดือนนี้</td></tr>` : 
+                        filtered.map(t => {
+                            let rows = '';
+                            const items = Array.isArray(t.SpareItems) ? t.SpareItems : [];
+                            items.forEach(item => {
+                                const spare = dataStore.spares.find(s => s.PartID === item.PartID) || {};
+                                rows += `
+                                <tr class="hover:bg-slate-50">
+                                    <td class="p-3 border border-slate-200">${new Date(t.created_at).toLocaleDateString('th-TH')}</td>
+                                    <td class="p-3 border border-slate-200 font-bold">${t.TransactionID || t.RequestID}</td>
+                                    <td class="p-3 border border-slate-200 text-blue-600">${item.PartID}</td>
+                                    <td class="p-3 border border-slate-200">${spare.PartName || '-'}</td>
+                                    <td class="p-3 text-center border border-slate-200 font-bold ${txType === 'Add' ? 'text-green-600' : 'text-orange-600'}">${txType === 'Add' ? '+' : '-'}${item.Qty}</td>
+                                    <td class="p-3 border border-slate-200">${t.User}</td>
+                                </tr>`;
+                            });
+                            return rows;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        resDiv.innerHTML = html;
+    }, 300); // ดีเลย์เล็กน้อยให้หน้าจอ UI ได้หายใจ
+}
+
+        // ==========================================
+        // ฟังก์ชันพิมพ์หน้ารายงาน
+        // ==========================================
+        function printSpecificReport() { 
+            const content = document.getElementById('reportResult').innerHTML;
+            if (!content || content.includes('กำลังสร้างรายงาน')) {
+                showIosAlert('แจ้งเตือน', 'กรุณาสร้างรายงานก่อนกดพิมพ์', 'info');
+                return;
+            }
+
+            const htmlContent = `
+                <html>
+                <head>
+                    <title>รายงานระบบ OnonoFixFlow</title>
+                    <style>
+                        body { font-family: 'Tahoma', sans-serif; padding: 20px; color: #333; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 13px; }
+                        th { background-color: #f8f9fa; border: 1px solid #ccc; padding: 10px; }
+                        td { border: 1px solid #ddd; padding: 8px; }
+                        .text-center { text-align: center; }
+                        .text-red-500 { color: #ef4444; }
+                        @media print { body { padding: 0; } }
+                    </style>
+                </head>
+                <body>
+                    <h2 style="text-align:center; margin-bottom: 20px;">THAI ONONO PUBLIC CO.,LTD.</h2>
+                    ${content}
+                </body>
+                </html>
+            `;
+
+            printViaIframe(htmlContent);
+        }
+
+        // ==========================================
+        // ฟังก์ชันตัวช่วยสร้าง iframe เพื่อสั่งพิมพ์ (ซ่อนตัวจากหน้าจอ)
+        // ==========================================
+        function printViaIframe(htmlContent) {
+            let printFrame = document.getElementById('printIframe');
+            
+            // ถ้ายังไม่มี iframe ให้สร้างใหม่ซ่อนไว้
+            if (!printFrame) {
+                printFrame = document.createElement('iframe');
+                printFrame.id = 'printIframe';
+                printFrame.style.position = 'fixed';
+                printFrame.style.right = '0';
+                printFrame.style.bottom = '0';
+                printFrame.style.width = '0';
+                printFrame.style.height = '0';
+                printFrame.style.border = '0';
+                document.body.appendChild(printFrame);
+            }
+
+            const frameDoc = printFrame.contentWindow.document;
+            frameDoc.open();
+            frameDoc.write(htmlContent);
+            frameDoc.close();
+
+            // รอให้เนื้อหาโหลดเสร็จแล้วค่อยสั่งพิมพ์
+            printFrame.onload = function() {
+                printFrame.contentWindow.focus();
+                printFrame.contentWindow.print();
+            };
+        }
+    </script>
+</body>
+</html>
