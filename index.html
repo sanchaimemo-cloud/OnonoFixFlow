@@ -1094,6 +1094,15 @@
         // ==========================================
         function toggleRepairModal(show) {
             document.getElementById('repairModal').classList.toggle('hidden', !show);
+            
+            // เติมข้อมูลผู้แจ้งและแผนกอัตโนมัติทุกครั้งที่เปิดหน้าต่าง
+            if (show && currentUser) {
+                const reporterInput = document.getElementById('formReporter');
+                const deptInput = document.getElementById('formDepartment');
+                
+                if (reporterInput) reporterInput.value = currentUser.fullName || currentUser.username || '';
+                if (deptInput && currentUser.department) deptInput.value = currentUser.department;
+            }
         }
 
         async function handleRequestSubmit(e) {
