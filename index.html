@@ -1334,9 +1334,6 @@
             }
         }
 
-        // ==========================================
-        // อัปเดตตารางประวัติให้มีปุ่มพิมพ์
-        // ==========================================
         async function renderHistoryTable() {
             const tbody = document.getElementById('historyTableBody');
             if (!tbody) return;
@@ -1350,7 +1347,6 @@
                 const date = new Date(t.created_at).toLocaleString('th-TH');
                 const isAdd = t.TransactionType === 'Add';
                 const items = Array.isArray(t.SpareItems) ? t.SpareItems : [];
-                // เตรียมข้อมูลเป็น JSON String สำหรับส่งไปพิมพ์
                 const printData = JSON.stringify({
                     TransactionID: t.TransactionID || '-',
                     RequestID: t.RequestID,
@@ -1360,34 +1356,44 @@
                     Type: t.TransactionType,
                     Remark: t.Remark || '-'
                 }).replace(/"/g, '&quot;');
-
+                
+                // กำหนดปุ่มและสถานะการเบิก
+                let statusBadge = '';
+                let actionBtn = '';
+                if (t.TransactionType === 'Withdraw') {
+                    const status = t.Status || 'จ่ายแล้ว'; // งานเก่าให้ถือว่าจ่ายแล้ว
+                    if (status === 'รออนุมัติ') {
+                        statusBadge = '<span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-[10px] font-bold">รออนุมัติ</span>';
+                        if (currentUser.role === 'Admin') {
+                            actionBtn = `<button onclick="approveWithdraw('${t.TransactionID}')" class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">อนุมัติ</button>`;
+                        } else {
+                            actionBtn = '<span class="text-xs text-slate-400">รอ Admin อนุมัติ</span>';
+                        }
+                    } else if (status === 'อนุมัติแล้ว') {
+                        statusBadge = '<span class="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold">รอจ่ายของ</span>';
+                        const encodeItems = encodeURIComponent(JSON.stringify(items));
+                        actionBtn = `<button onclick="dispenseWithdraw('${t.TransactionID}', '${encodeItems}')" class="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">จ่ายอะไหล่</button>`;
+                    } else {
+                        statusBadge = '<span class="px-2 py-1 bg-gray-100 text-gray-600 rounded-full text-[10px] font-bold">จ่ายแล้ว</span>';
+                        actionBtn = `<button onclick="rePrintTransaction('${printData}')" class="text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fas fa-print"></i></button>`;
+                    }
+                } else {
+                    statusBadge = '<span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold">นำเข้า</span>';
+                    actionBtn = `<button onclick="rePrintTransaction('${printData}')" class="text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold"><i class="fas fa-print"></i></button>`;
+                }
+        
                 items.forEach((item, index) => {
                     const spare = dataStore.spares.find(s => s.PartID === item.PartID) || {};
                     html += `
                         <tr class="hover:bg-gray-50 transition border-b border-gray-50 whitespace-nowrap">
-                            <td class="px-3 py-3 md:px-6 md:py-4 text-gray-400 text-[10px] md:text-sm">${date}</td>
-                            <td class="px-3 py-3 md:px-6 md:py-4">
-                                <span class="px-2 py-1 md:px-3 md:py-1.5 rounded-full text-[9px] md:text-[12px] font-bold tracking-wider ${isAdd ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}">
-                                    ${isAdd ? 'นำเข้า' : 'เบิกออก'}
-                                </span>
-                            </td>
-                            <td class="px-3 py-3 md:px-6 md:py-4 font-medium text-slate-700 text-[11px] md:text-sm">
-                                ${t.RequestID}<br>
-                                <span class="text-[9px] md:text-xs text-slate-400 font-normal">${t.User || '-'}</span>
-                            </td>
-                            <td class="px-3 py-3 md:px-6 md:py-4 font-mono text-blue-600 font-bold text-[11px] md:text-sm">${item.PartID}</td>
-                            <td class="px-3 py-3 md:px-6 md:py-4 text-slate-600 text-[11px] md:text-sm whitespace-normal min-w-[120px] md:min-w-auto leading-tight">${spare.PartName || '-'}</td>
-                            <td class="px-3 py-3 md:px-6 md:py-4 text-center font-bold ${isAdd ? 'text-green-600' : 'text-orange-600'} text-[11px] md:text-sm">
-                                ${isAdd ? '+' : '-'}${item.Qty}
-                            </td>
-                            <td class="px-3 py-3 md:px-6 md:py-4 text-gray-500 text-[11px] md:text-sm">${spare.Unit || '-'}</td>
-                            <td class="px-3 py-3 md:px-6 md:py-4 text-center">
-                                ${index === 0 ? `
-                                    <button onclick="rePrintTransaction('${printData}')" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 md:px-3 md:py-1.5 rounded-lg transition font-bold text-[10px] md:text-sm flex items-center justify-center gap-1 mx-auto shadow-sm">
-                                        <i class="fas fa-print"></i> <span class="hidden md:inline">พิมพ์</span>
-                                    </button>
-                                ` : ''}
-                            </td>
+                            <td class="px-3 py-3 text-gray-400 text-xs">${date}</td>
+                            <td class="px-3 py-3">${statusBadge}</td>
+                            <td class="px-3 py-3 font-medium text-slate-700 text-xs">${t.RequestID}<br><span class="text-[9px] text-slate-400">${t.User || '-'}</span></td>
+                            <td class="px-3 py-3 font-mono text-blue-600 font-bold text-xs">${item.PartID}</td>
+                            <td class="px-3 py-3 text-slate-600 text-xs whitespace-normal min-w-[120px]">${spare.PartName || '-'}</td>
+                            <td class="px-3 py-3 text-center font-bold ${isAdd ? 'text-green-600' : 'text-orange-600'} text-xs">${isAdd ? '+' : '-'}${item.Qty}</td>
+                            <td class="px-3 py-3 text-gray-500 text-xs">${spare.Unit || '-'}</td>
+                            <td class="px-3 py-3 text-center">${index === 0 ? actionBtn : ''}</td>
                         </tr>
                     `;
                 });
@@ -1854,6 +1860,37 @@ function showStatDetail(status) {
                 printFrame.contentWindow.print();
             };
         }
+    // ==========================================
+    // ระบบอนุมัติและจ่ายอะไหล่
+    // ==========================================
+    async function approveWithdraw(transactionId) {
+        if(!confirm('ยืนยันการอนุมัติใบเบิกนี้?')) return;
+        setLoading(true);
+        try {
+            await fetch(GAS_API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'approveWithdraw', transactionId, adminName: currentUser.fullName })
+            });
+            await fetchAllData();
+            showIosAlert('สำเร็จ', 'อนุมัติรายการเบิกเรียบร้อย', 'success');
+        } catch(err) { showError(err.message); }
+        finally { setLoading(false); }
+    }
+    
+    async function dispenseWithdraw(transactionId, itemsStr) {
+        if(!confirm('ยืนยันการจ่ายอะไหล่และตัดสต็อก?')) return;
+        setLoading(true);
+        try {
+            const items = JSON.parse(decodeURIComponent(itemsStr));
+            await fetch(GAS_API_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'dispenseWithdraw', transactionId, items, userName: currentUser.fullName })
+            });
+            await fetchAllData();
+            showIosAlert('สำเร็จ', 'จ่ายอะไหล่และตัดสต็อกเรียบร้อย', 'success');
+        } catch(err) { showError(err.message); }
+        finally { setLoading(false); }
+    }
     </script>
 </body>
 </html>
