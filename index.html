@@ -916,11 +916,27 @@
         function renderRequestList() {
             const container = document.getElementById('requestDisplayList');
             if (!container) return;
-            if (dataStore.requests.length === 0) {
+        
+            // 1. ดึงวันที่ปัจจุบัน (รูปแบบ YYYY-MM-DD)
+            const today = new Date().toISOString().split('T')[0];
+        
+            // 2. กรองข้อมูลตามเงื่อนไข: วันนี้ หรือ สถานะ Pending หรือ สถานะ In Progress
+            const filteredRequests = dataStore.requests.filter(r => {
+                const reqDate = r.RequestDateTime || '';
+                const isToday = reqDate.startsWith(today);
+                const isPending = r.Status === 'Pending';
+                const isInProgress = r.Status === 'In Progress';
+                
+                return isToday || isPending || isInProgress;
+            });
+        
+            if (filteredRequests.length === 0) {
                 container.innerHTML = `<p class="text-center py-10 text-gray-400 font-bold">ไม่มีรายการแจ้งซ่อม</p>`;
                 return;
             }
-            container.innerHTML = dataStore.requests.map(r => {
+        
+            // 3. แสดงผลเฉพาะรายการที่ผ่านการกรอง (filteredRequests)
+            container.innerHTML = filteredRequests.map(r => {
                 const formatTime = (isoStr) => isoStr ? new Date(isoStr).toLocaleString('th-TH', {hour:'2-digit', minute:'2-digit', day:'2-digit', month:'2-digit'}) : '-';
                 const statusBadge = r.Status === 'Completed' 
                     ? '<span class="px-2 py-1 md:px-3 bg-emerald-100 text-emerald-600 rounded-full text-[10px] md:text-sm font-bold flex items-center gap-1"><i class="far fa-check-circle"></i> เสร็จสิ้น</span>'
@@ -995,7 +1011,6 @@
                 `;
             }).join('');
         }
-
         function updateDashboardUI() {
             const today = new Date().toISOString().split('T')[0];
             const todayReqs = dataStore.requests.filter(r => (r.RequestDateTime || '').includes(today));
