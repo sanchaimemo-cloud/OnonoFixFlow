@@ -606,6 +606,28 @@
         </div>
     </div>
 
+    <!-- Custom Confirm Modal (Glassmorphism) -->
+    <div id="confirmModal" class="fixed inset-0 z-[400] hidden flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/30 backdrop-blur-sm" onclick="closeConfirmModal(false)"></div>
+        <div class="relative w-full max-w-[320px] bg-white/70 backdrop-blur-xl border border-white/50 rounded-[32px] shadow-[0_8px_32px_rgba(0,0,0,0.12)] text-center overflow-hidden animate-popIn">
+            <div class="px-6 pt-8 pb-6">
+                <div class="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center text-3xl shadow-sm bg-yellow-100/80 text-yellow-500 border border-white">
+                    <i class="fas fa-question"></i>
+                </div>
+                <h3 id="confirmTitle" class="text-xl font-bold text-slate-800 mb-2 tracking-tight">ยืนยัน?</h3>
+                <p id="confirmMessage" class="text-sm text-slate-600 font-medium leading-relaxed">ข้อความยืนยัน</p>
+            </div>
+            <div class="flex border-t border-slate-300/40">
+                <button onclick="closeConfirmModal(false)" class="flex-1 py-4 text-slate-500 font-bold text-base border-r border-slate-300/40 hover:bg-white/40 transition-colors">
+                    ยกเลิก
+                </button>
+                <button onclick="closeConfirmModal(true)" class="flex-1 py-4 text-indigo-600 font-bold text-lg hover:bg-white/40 transition-colors">
+                    ตกลง
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- iOS 18 Glassmorphism Alert Modal -->
 <div id="iosAlertModal" class="fixed inset-0 z-[400] hidden flex items-center justify-center p-4">
   <!-- Backdrop Blur -->
@@ -1864,32 +1886,73 @@ function showStatDetail(status) {
     // ระบบอนุมัติและจ่ายอะไหล่
     // ==========================================
     async function approveWithdraw(transactionId) {
-        if(!confirm('ยืนยันการอนุมัติใบเบิกนี้?')) return;
+        const isConfirmed = await showCustomConfirm('ยืนยันการอนุมัติ', 'คุณต้องการอนุมัติใบเบิกนี้ใช่หรือไม่?');
+        if (!isConfirmed) return;
+        
         setLoading(true);
         try {
             await fetch(GAS_API_URL, {
                 method: 'POST',
-                body: JSON.stringify({ action: 'approveWithdraw', transactionId, adminName: currentUser.fullName })
+                body: JSON.stringify({ 
+                    action: 'approveWithdraw', 
+                    transactionId: transactionId, 
+                    adminName: currentUser.fullName 
+                })
             });
+            
             await fetchAllData();
             showIosAlert('สำเร็จ', 'อนุมัติรายการเบิกเรียบร้อย', 'success');
-        } catch(err) { showError(err.message); }
-        finally { setLoading(false); }
+        } catch(err) { 
+            showError(err.message); 
+        } finally { 
+            setLoading(false); 
+        }
     }
     
     async function dispenseWithdraw(transactionId, itemsStr) {
-        if(!confirm('ยืนยันการจ่ายอะไหล่และตัดสต็อก?')) return;
+        const isConfirmed = await showCustomConfirm('ยืนยันการจ่ายอะไหล่', 'คุณต้องการจ่ายอะไหล่และตัดสต็อกนี้ใช่หรือไม่?');
+        if (!isConfirmed) return;
+        
         setLoading(true);
         try {
             const items = JSON.parse(decodeURIComponent(itemsStr));
             await fetch(GAS_API_URL, {
                 method: 'POST',
-                body: JSON.stringify({ action: 'dispenseWithdraw', transactionId, items, userName: currentUser.fullName })
+                body: JSON.stringify({ 
+                    action: 'dispenseWithdraw', 
+                    transactionId: transactionId, 
+                    items: items, 
+                    userName: currentUser.fullName 
+                })
             });
+            
             await fetchAllData();
             showIosAlert('สำเร็จ', 'จ่ายอะไหล่และตัดสต็อกเรียบร้อย', 'success');
-        } catch(err) { showError(err.message); }
-        finally { setLoading(false); }
+        } catch(err) { 
+            showError(err.message); 
+        } finally { 
+            setLoading(false); 
+        }
+    }
+
+    let confirmResolve = null;
+
+    function showCustomConfirm(title, message) {
+        document.getElementById('confirmTitle').innerText = title;
+        document.getElementById('confirmMessage').innerText = message;
+        document.getElementById('confirmModal').classList.remove('hidden');
+        
+        return new Promise((resolve) => {
+            confirmResolve = resolve;
+        });
+    }
+    
+    function closeConfirmModal(result) {
+        document.getElementById('confirmModal').classList.add('hidden');
+        if (confirmResolve) {
+            confirmResolve(result);
+            confirmResolve = null;
+        }
     }
     </script>
 </body>
