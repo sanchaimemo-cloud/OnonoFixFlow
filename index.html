@@ -325,44 +325,53 @@
             </div>
 
             <!-- Withdraw Form -->
-            <div id="subContentWithdraw" class="inventory-sub-content hidden animate-fadeIn">
-                <div class="max-w-4xl mx-auto">
-                    <form onsubmit="handleWithdrawSubmit(event)" class="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
-                        <h3 class="text-2xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">
-                            <i class="fas fa-minus-circle mr-2"></i> บันทึกการเบิกอะไหล่
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                            <div>
-                                <label class="text-medium font-bold text-gray-400 uppercase">อ้างอิงใบแจ้งซ่อม</label>
-                                <select id="withdrawRequestID" required class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-400">
-                                    <option value="">-- เลือกรายการแจ้งซ่อม --</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="text-medium font-bold text-gray-400 uppercase">ชื่อผู้เบิก</label>
-                                <input type="text" id="withdrawUser" required class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-400">
-                            </div>
-                        </div>
-                        <div class="mb-6">
-                            <div class="flex justify-between items-center mb-4">
-                                <label class="text-medium font-bold text-gray-400 uppercase">รายการอะไหล่ที่เบิก</label>
-                                <button type="button" onclick="addSpareRow()" class="text-medium text-blue-600 font-bold">
-                                    <i class="fas fa-plus-circle"></i> เพิ่มรายการ
-                                </button>
-                            </div>
-                            <div id="spareItemsContainer" class="space-y-3"></div>
-                        </div>
-                        <div class="mb-8">
-                            <label class="text-medium font-bold text-gray-400 uppercase">หมายเหตุเพิ่มเติม</label>
-                            <textarea id="withdrawRemark" rows="3" placeholder="ระบุรายละเอียดเพิ่มเติม (ถ้ามี)..." 
-                                class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-400 resize-none"></textarea>
-                        </div>
-                        <button type="submit" class="w-full py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white text-xl rounded-2xl font-bold shadow-lg hover:scale-[1.01] transition-transform">
-                            ยืนยันการเบิกและตัดสต็อก
-                        </button>
-                    </form>
+<div id="subContentWithdraw" class="inventory-sub-content hidden animate-fadeIn">
+    <div class="max-w-4xl mx-auto">
+        <form onsubmit="handleWithdrawSubmit(event)" class="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+            <h3 class="text-2xl font-bold mb-8 text-transparent bg-clip-text bg-gradient-to-r from-orange-500 to-red-600">
+                <i class="fas fa-minus-circle mr-2"></i> บันทึกการเบิกอะไหล่
+            </h3>
+            
+            <!-- เพิ่มช่องเลขที่ใบเบิก และปรับ Grid เป็น 3 คอลัมน์ -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div>
+                    <label class="text-medium font-bold text-gray-400 uppercase">เลขที่ใบเบิก</label>
+                    <input type="text" value="สร้างอัตโนมัติเมื่อบันทึก" readonly class="w-full mt-1 p-3 bg-gray-100 text-gray-400 border border-gray-200 rounded-2xl outline-none cursor-not-allowed font-medium text-center">
+                </div>
+                <div>
+                    <label class="text-medium font-bold text-gray-400 uppercase">อ้างอิงใบแจ้งซ่อม</label>
+                    <select id="withdrawRequestID" required class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-400">
+                        <option value="">-- เลือกรายการแจ้งซ่อม --</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="text-medium font-bold text-gray-400 uppercase">ชื่อผู้เบิก</label>
+                    <input type="text" id="withdrawUser" required class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-400">
                 </div>
             </div>
+
+            <div class="mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <label class="text-medium font-bold text-gray-400 uppercase">รายการอะไหล่ที่เบิก</label>
+                    <button type="button" onclick="addSpareRow()" class="text-medium text-blue-600 font-bold">
+                        <i class="fas fa-plus-circle"></i> เพิ่มรายการ
+                    </button>
+                </div>
+                <div id="spareItemsContainer" class="space-y-3"></div>
+            </div>
+            
+            <div class="mb-8">
+                <label class="text-medium font-bold text-gray-400 uppercase">หมายเหตุเพิ่มเติม</label>
+                <textarea id="withdrawRemark" rows="3" placeholder="ระบุรายละเอียดเพิ่มเติม (ถ้ามี)..." 
+                    class="w-full mt-1 p-3 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-orange-400 resize-none"></textarea>
+            </div>
+            
+            <button type="submit" class="w-full py-4 bg-gradient-to-r from-orange-500 to-red-600 text-white text-xl rounded-2xl font-bold shadow-lg hover:scale-[1.01] transition-transform">
+                ยืนยันการเบิกและตัดสต็อก
+            </button>
+        </form>
+    </div>
+</div>
 
             <!-- Add Stock Form -->
             <div id="subContentAddStock" class="inventory-sub-content hidden animate-fadeIn">
