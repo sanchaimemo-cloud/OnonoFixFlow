@@ -1905,58 +1905,70 @@ function showStatDetail(status) {
                 printFrame.contentWindow.print();
             };
         }
-    // ==========================================
-    // ระบบอนุมัติและจ่ายอะไหล่
-    // ==========================================
     async function approveWithdraw(transactionId) {
-        const isConfirmed = await showCustomConfirm('ยืนยันการอนุมัติ', 'คุณต้องการอนุมัติใบเบิกนี้ใช่หรือไม่?');
-        if (!isConfirmed) return;
-        
-        setLoading(true);
-        try {
-            await fetch(GAS_API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ 
-                    action: 'approveWithdraw', 
-                    transactionId: transactionId, 
-                    adminName: currentUser.fullName 
-                })
-            });
-            
-            await fetchAllData();
-            showIosAlert('สำเร็จ', 'อนุมัติรายการเบิกเรียบร้อย', 'success');
-        } catch(err) { 
-            showError(err.message); 
-        } finally { 
-            setLoading(false); 
-        }
+    if (String(currentUser.role).trim().toLowerCase() !== 'admin') {
+        return showError('เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถอนุมัติได้');
     }
+
+    const isConfirmed = await showCustomConfirm('ยืนยันการอนุมัติ', 'คุณต้องการอนุมัติใบเบิกนี้ใช่หรือไม่?');
+    if (!isConfirmed) return;
     
-    async function dispenseWithdraw(transactionId, itemsStr) {
-        const isConfirmed = await showCustomConfirm('ยืนยันการจ่ายอะไหล่', 'คุณต้องการจ่ายอะไหล่และตัดสต็อกนี้ใช่หรือไม่?');
-        if (!isConfirmed) return;
+    setLoading(true);
+    try {
+        const res = await fetch(GAS_API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ 
+                action: 'approveWithdraw', 
+                transactionId: transactionId, 
+                adminName: currentUser.fullName,
+                role: currentUser.role // ส่ง Role ไปตรวจฝั่งหลังบ้าน
+            })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
         
-        setLoading(true);
-        try {
-            const items = JSON.parse(decodeURIComponent(itemsStr));
-            await fetch(GAS_API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ 
-                    action: 'dispenseWithdraw', 
-                    transactionId: transactionId, 
-                    items: items, 
-                    userName: currentUser.fullName 
-                })
-            });
-            
-            await fetchAllData();
-            showIosAlert('สำเร็จ', 'จ่ายอะไหล่และตัดสต็อกเรียบร้อย', 'success');
-        } catch(err) { 
-            showError(err.message); 
-        } finally { 
-            setLoading(false); 
-        }
+        await fetchAllData();
+        showIosAlert('สำเร็จ', 'อนุมัติรายการเบิกเรียบร้อย', 'success');
+    } catch(err) { 
+        showError(err.message); 
+    } finally { 
+        setLoading(false); 
     }
+}
+
+async function dispenseWithdraw(transactionId, itemsStr) {
+    const userRole = String(currentUser.role).trim().toLowerCase();
+    if (userRole !== 'admin' && userRole !== 'inventory') {
+        return showError('เฉพาะ Admin หรือ พนักงานคลัง เท่านั้นที่สามารถจ่ายอะไหล่ได้');
+    }
+
+    const isConfirmed = await showCustomConfirm('ยืนยันการจ่ายอะไหล่', 'คุณต้องการจ่ายอะไหล่และตัดสต็อกนี้ใช่หรือไม่?');
+    if (!isConfirmed) return;
+    
+    setLoading(true);
+    try {
+        const items = JSON.parse(decodeURIComponent(itemsStr));
+        const res = await fetch(GAS_API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ 
+                action: 'dispenseWithdraw', 
+                transactionId: transactionId, 
+                items: items, 
+                userName: currentUser.fullName,
+                role: currentUser.role // ส่ง Role ไปตรวจฝั่งหลังบ้าน
+            })
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        
+        await fetchAllData();
+        showIosAlert('สำเร็จ', 'จ่ายอะไหล่และตัดสต็อกเรียบร้อย', 'success');
+    } catch(err) { 
+        showError(err.message); 
+    } finally { 
+        setLoading(false); 
+    }
+}
 
     let confirmResolve = null;
 
